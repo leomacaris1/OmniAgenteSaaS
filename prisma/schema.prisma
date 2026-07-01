@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Project {
+  id             String              @id @default(cuid())
+  title          String
+  idea           String
+  audience       String?
+  region         String?
+  constraints    String?
+  provider       String
+  promptVersion  String
+  output         Json
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  runs           AgentRun[]
+  artifacts      GeneratedArtifact[]
+}
+
+model AgentRun {
+  id        String   @id @default(cuid())
+  projectId String
+  builder   String
+  provider  String
+  agents    String[]
+  status    String
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model PromptVersion {
+  id        String   @id @default(cuid())
+  key       String
+  version   String
+  content   String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([key, version])
+}
+
+model GeneratedArtifact {
+  id        String   @id @default(cuid())
+  projectId String
+  type      String
+  title     String
+  content   Json
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
