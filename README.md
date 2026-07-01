@@ -21,12 +21,17 @@ src/
 ├── app/
 │   ├── api/
 │   │   ├── builders/saas/route.ts
-│   │   └── projects/route.ts
+│   │   ├── projects/route.ts
+│   │   └── projects/[projectId]/artifacts/[artifactKey]/route.ts
+│   ├── projects/[projectId]/page.tsx
 │   └── page.tsx
 ├── components/
-│   └── omniagent/saas-builder-workbench.tsx
+│   └── omniagent/
+│       ├── project-artifact-editor.tsx
+│       └── saas-builder-workbench.tsx
 └── lib/
     └── omniagent/
+        ├── artifacts.ts
         ├── agents/registry.ts
         ├── builders/saas-builder.ts
         ├── prompts/saas-builder.v1.ts
@@ -49,6 +54,21 @@ src/
 4. El provider genera el plan estructurado.
 5. El proyecto y la ejecución quedan guardados.
 6. El Command Center muestra resultado e historial.
+7. Cada proyecto puede abrirse en `/projects/[projectId]`.
+8. Los artefactos principales pueden editarse y guardarse como JSON estructurado.
+
+## Artefactos editables
+
+El detalle de proyecto convierte la salida del builder en activos versionables del producto:
+
+- Validación del nicho.
+- Backlog MVP.
+- Landing page.
+- Pricing.
+- Plan de lanzamiento.
+- Plan para primeros clientes y riesgos.
+
+La edición vive en `src/lib/omniagent/artifacts.ts`, no dentro de la UI. Esto permite reemplazar la persistencia local por Prisma/Supabase sin cambiar la experiencia del usuario.
 
 ## Variables de entorno
 
@@ -82,6 +102,7 @@ Abrir `http://localhost:3000`.
 Verificaciones:
 
 ```bash
+npm test
 npm run lint
 npm run build
 ```

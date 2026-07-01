@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { updateEditableArtifact, type EditableArtifactKey } from "@/lib/omniagent/artifacts";
 import type { AgentRun, SaaSBuilderOutput } from "@/lib/omniagent/types";
 
 type OmniAgentStore = {
@@ -45,6 +46,29 @@ export async function saveProject(
 export async function listProjects() {
   const store = await readStore();
   return store.projects;
+}
+
+export async function getProject(projectId: string) {
+  const store = await readStore();
+  return store.projects.find((project) => project.id === projectId) ?? null;
+}
+
+export async function updateProjectArtifact(
+  projectId: string,
+  key: EditableArtifactKey,
+  content: unknown,
+) {
+  const store = await readStore();
+  const projectIndex = store.projects.findIndex((project) => project.id === projectId);
+
+  if (projectIndex === -1) {
+    return null;
+  }
+
+  const updatedProject = updateEditableArtifact(store.projects[projectIndex], key, content);
+  store.projects[projectIndex] = updatedProject;
+  await writeStore(store);
+  return updatedProject;
 }
 
 export async function listRuns() {

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Activity,
   Archive,
@@ -204,15 +205,15 @@ export function SaaSBuilderWorkbench() {
               <CardContent className="space-y-2">
                 {history.length ? (
                   history.slice(0, 6).map((item) => (
-                    <button
+                    <Link
                       key={item.id}
-                      type="button"
-                      onClick={() => setProject(item)}
+                      href={`/projects/${item.id}`}
+                      onMouseEnter={() => setProject(item)}
                       className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left text-sm transition hover:bg-accent"
                     >
                       <span className="line-clamp-1">{item.input.idea}</span>
                       <Badge variant="outline">{item.provider}</Badge>
-                    </button>
+                    </Link>
                   ))
                 ) : (
                   <p className="text-sm text-muted-foreground">Todavía no hay ejecuciones guardadas.</p>
@@ -266,6 +267,9 @@ function ProjectResult({ project }: { project: SaaSBuilderOutput }) {
               Score {project.nicheValidation.score}
             </Badge>
           </div>
+          <Button asChild className="w-fit">
+            <Link href={`/projects/${project.id}`}>Abrir proyecto</Link>
+          </Button>
           <Separator />
           <div className="grid gap-3 md:grid-cols-3">
             <Summary icon={Users} label="Usuarios" value={project.targetUsers.length.toString()} />
