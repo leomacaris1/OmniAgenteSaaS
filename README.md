@@ -12,6 +12,7 @@ Este primer MVP implementa el módulo **SaaS Builder**: el usuario ingresa una i
 - Adapter OpenAI preparado y configurable con `OMNIAGENT_MODEL_PROVIDER=openai`.
 - Persistencia local en `data/omniagent.json` para proyectos y ejecuciones.
 - Esquema Prisma inicial para migrar a PostgreSQL/Supabase.
+- Proyecto Supabase dedicado: `OmniAgenteSaaS` (`fxnrgzxmhorwpdysclue`).
 - Dashboard y Command Center funcionales en la pantalla principal.
 
 ## Arquitectura
@@ -135,6 +136,12 @@ npm run prisma:push
 ```
 
 El proyecto Supabase dedicado debe tener un `DATABASE_URL` servidor-side. No expongas `service_role` ni secretos en variables `NEXT_PUBLIC_*`.
+
+Proyecto actual:
+
+- Supabase ref: `fxnrgzxmhorwpdysclue`
+- Supabase URL: `https://fxnrgzxmhorwpdysclue.supabase.co`
+- GitHub: `https://github.com/leomacaris1/OmniAgenteSaaS`
 
 Nota operativa: en esta máquina no está instalado Supabase CLI. Si se instala, el flujo correcto para migraciones Supabase es crear archivos con `supabase migration new <name>`, no inventar nombres manualmente.
 
