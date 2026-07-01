@@ -2,13 +2,22 @@ import { updateEditableArtifact, type EditableArtifactKey } from "@/lib/omniagen
 import type { AgentRun, SaaSBuilderOutput } from "@/lib/omniagent/types";
 import type { ProjectRepository, SaveProjectRunInput } from "@/lib/omniagent/storage/types";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 let prismaClient: PrismaClient | null = null;
 
 async function getPrismaClient() {
   if (!prismaClient) {
     const { PrismaClient } = await import("@/generated/prisma/client");
-    prismaClient = new PrismaClient();
+    const connectionString = process.env.DATABASE_URL;
+
+    if (!connectionString) {
+      throw new Error("DATABASE_URL is required when OMNIAGENT_STORAGE_DRIVER=prisma.");
+    }
+
+    prismaClient = new PrismaClient({
+      adapter: new PrismaPg({ connectionString }),
+    });
   }
 
   return prismaClient;
