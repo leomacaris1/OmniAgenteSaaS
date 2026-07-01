@@ -76,6 +76,7 @@ Copia `.env.example` a `.env.local`.
 
 ```bash
 OMNIAGENT_MODEL_PROVIDER=local
+OMNIAGENT_STORAGE_DRIVER=file
 OPENAI_MODEL=gpt-5.4-mini
 OPENAI_API_KEY=
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/omniagent
@@ -89,6 +90,15 @@ OPENAI_API_KEY=...
 ```
 
 El modelo default recomendado para el adapter es `gpt-5.4-mini`, pero puede cambiarse con `OPENAI_MODEL`.
+
+Para usar Postgres/Supabase como persistencia:
+
+```bash
+OMNIAGENT_STORAGE_DRIVER=prisma
+DATABASE_URL=postgresql://...
+```
+
+`file` sigue siendo el default para desarrollo local sin credenciales. `prisma` usa el schema de `prisma/schema.prisma` y mantiene el mismo contrato de repositorio.
 
 ## Correr localmente
 
@@ -109,7 +119,14 @@ npm run build
 
 ## Base de datos
 
-El MVP usa archivo local para acelerar el desarrollo. Para pasar a Supabase/PostgreSQL:
+El MVP usa archivo local para acelerar el desarrollo. La app ya tiene una capa `ProjectRepository` para cambiar de persistencia sin tocar las rutas ni la UI.
+
+Drivers:
+
+- `file`: guarda en `data/omniagent.json`.
+- `prisma`: guarda en Postgres/Supabase usando Prisma.
+
+Para preparar el cliente y empujar schema a una base Postgres:
 
 ```bash
 cp .env.example .env.local
@@ -117,7 +134,9 @@ npm run prisma:generate
 npm run prisma:push
 ```
 
-Luego reemplazar `src/lib/omniagent/storage/project-store.ts` por un repositorio Prisma manteniendo la misma interfaz (`saveProject`, `listProjects`, `listRuns`).
+El proyecto Supabase dedicado debe tener un `DATABASE_URL` servidor-side. No expongas `service_role` ni secretos en variables `NEXT_PUBLIC_*`.
+
+Nota operativa: en esta máquina no está instalado Supabase CLI. Si se instala, el flujo correcto para migraciones Supabase es crear archivos con `supabase migration new <name>`, no inventar nombres manualmente.
 
 ## Plan técnico de 7 días
 
