@@ -65,6 +65,7 @@ export type LaunchStep = {
 
 export type SaaSBuilderOutput = {
   id: string;
+  workspaceId?: string;
   createdAt: string;
   provider: ProviderName;
   promptVersion: string;

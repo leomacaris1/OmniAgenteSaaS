@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { updateEditableArtifact } from "@/lib/omniagent/artifacts";
 import type { AgentRun, SaaSBuilderOutput } from "@/lib/omniagent/types";
-import type { ProjectRepository, SaveProjectRunInput } from "@/lib/omniagent/storage/types";
+import type { ProjectRepository, ProjectScope, SaveProjectRunInput } from "@/lib/omniagent/storage/types";
 
 type OmniAgentStore = {
   projects: SaaSBuilderOutput[];
@@ -26,12 +26,17 @@ async function writeStore(store: OmniAgentStore) {
   await writeFile(storePath, `${JSON.stringify(store, null, 2)}\n`, "utf8");
 }
 
+function isProjectInScope(project: SaaSBuilderOutput, scope?: ProjectScope) {
+  return !scope?.workspaceId || project.workspaceId === scope.workspaceId;
+}
+
 export const fileProjectRepository: ProjectRepository = {
-  async saveProject(project: SaaSBuilderOutput, run: SaveProjectRunInput) {
+  async saveProject(project: SaaSBuilderOutput, run: SaveProjectRunInput, scope?: ProjectScope) {
     const store = await readStore();
+    const scopedProject = scope?.workspaceId ? { ...project, workspaceId: scope.workspaceId } : project;
     const agentRun: AgentRun = {
       id: crypto.randomUUID(),
-      projectId: project.id,
+      projectId: scopedProject.id,
       createdAt: new Date().toISOString(),
       status: "completed",
       builder: run.builder,
@@ -39,24 +44,31 @@ export const fileProjectRepository: ProjectRepository = {
       agents: run.agents,
     };
 
-    store.projects = [project, ...store.projects].slice(0, 50);
+    store.projects = [scopedProject, ...store.projects].slice(0, 50);
     store.runs = [agentRun, ...store.runs].slice(0, 100);
     await writeStore(store);
   },
 
-  async listProjects() {
+  async listProjects(scope?: ProjectScope) {
     const store = await readStore();
-    return store.projects;
+    return store.projects.filter((project) => isProjectInScope(project, scope));
   },
 
-  async getProject(projectId: string) {
+  async countProjects(scope?: ProjectScope) {
     const store = await readStore();
-    return store.projects.find((project) => project.id === projectId) ?? null;
+    return store.projects.filter((project) => isProjectInScope(project, scope)).length;
   },
 
-  async updateProjectArtifact(projectId, key, content) {
+  async getProject(projectId: string, scope?: ProjectScope) {
     const store = await readStore();
-    const projectIndex = store.projects.findIndex((project) => project.id === projectId);
+    return store.projects.find((project) => project.id === projectId && isProjectInScope(project, scope)) ?? null;
+  },
+
+  async updateProjectArtifact(projectId, key, content, scope) {
+    const store = await readStore();
+    const projectIndex = store.projects.findIndex(
+      (project) => project.id === projectId && isProjectInScope(project, scope),
+    );
 
     if (projectIndex === -1) {
       return null;
@@ -68,8 +80,13 @@ export const fileProjectRepository: ProjectRepository = {
     return updatedProject;
   },
 
-  async listRuns() {
+  async listRuns(scope?: ProjectScope) {
     const store = await readStore();
-    return store.runs;
+    if (!scope?.workspaceId) {
+      return store.runs;
+    }
+
+    const projectIds = new Set(store.projects.filter((project) => isProjectInScope(project, scope)).map((project) => project.id));
+    return store.runs.filter((run) => projectIds.has(run.projectId));
   },
 };

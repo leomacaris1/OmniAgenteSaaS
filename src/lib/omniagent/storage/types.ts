@@ -7,16 +7,21 @@ export type SaveProjectRunInput = Pick<AgentRun, "builder" | "provider" | "agent
   // once auth lands, callers should start passing the real org from session.
   organizationId?: string;
   createdByUserId?: string;
+export type SaveProjectRunInput = Pick<AgentRun, "builder" | "provider" | "agents">;
+export type ProjectScope = {
+  workspaceId?: string;
 };
 
 export type ProjectRepository = {
-  saveProject(project: SaaSBuilderOutput, run: SaveProjectRunInput): Promise<void>;
-  listProjects(): Promise<SaaSBuilderOutput[]>;
-  getProject(projectId: string): Promise<SaaSBuilderOutput | null>;
+  saveProject(project: SaaSBuilderOutput, run: SaveProjectRunInput, scope?: ProjectScope): Promise<void>;
+  listProjects(scope?: ProjectScope): Promise<SaaSBuilderOutput[]>;
+  countProjects(scope?: ProjectScope): Promise<number>;
+  getProject(projectId: string, scope?: ProjectScope): Promise<SaaSBuilderOutput | null>;
   updateProjectArtifact(
     projectId: string,
     key: EditableArtifactKey,
     content: unknown,
+    scope?: ProjectScope,
   ): Promise<SaaSBuilderOutput | null>;
-  listRuns(): Promise<AgentRun[]>;
+  listRuns(scope?: ProjectScope): Promise<AgentRun[]>;
 };

@@ -2,85 +2,89 @@
 
 OmniAgent es una plataforma modular de agentes IA para crear, validar, construir y lanzar micro-SaaS, automatizaciones, productos digitales y negocios verticales.
 
-Este primer MVP implementa el módulo **SaaS Builder**: el usuario ingresa una idea y recibe validación del nicho, propuesta de valor, usuarios objetivo, funcionalidades MVP, arquitectura técnica, backlog, landing page inicial, pricing, plan de lanzamiento de 7 días y plan para conseguir primeros clientes.
+Este MVP implementa primero **SaaS Builder**. El usuario ingresa una idea y recibe validacion del nicho, propuesta de valor, usuarios objetivo, funcionalidades MVP, arquitectura tecnica, backlog, landing page inicial, pricing, plan de lanzamiento de 7 dias y plan para conseguir primeros clientes.
 
 ## Estado del MVP
 
 - Next.js App Router, React, Tailwind CSS y shadcn/ui.
+- Command Center privado con registro, login, cookie HttpOnly y logout.
+- Workspaces: cada usuario tiene un workspace y solo ve sus proyectos.
+- Limite configurable de proyectos por workspace para pilotos privados.
 - Core modular con agentes, prompts versionados, provider adapter y builder.
-- Provider local determinístico por defecto para trabajar sin credenciales.
-- Adapter OpenAI preparado y configurable con `OMNIAGENT_MODEL_PROVIDER=openai`.
-- Persistencia local en `data/omniagent.json` para proyectos y ejecuciones.
-- Esquema Prisma inicial para migrar a PostgreSQL/Supabase.
-- Proyecto Supabase dedicado: `OmniAgenteSaaS` (`fxnrgzxmhorwpdysclue`).
-- Dashboard y Command Center funcionales en la pantalla principal.
+- Provider local deterministico por defecto para trabajar sin credenciales.
+- Adapter OpenAI preparado con `OMNIAGENT_MODEL_PROVIDER=openai`.
+- Persistencia por repositorio intercambiable: archivo local o Prisma/Postgres.
+- Supabase/Postgres conectado para proyectos, ejecuciones, usuarios, sesiones y workspaces.
+- Artefactos editables por proyecto: validacion, backlog, landing, pricing y lanzamiento.
+- Export Markdown/JSON por proyecto.
+- Captura de feedback de pilotos con rating y comentario.
 
 ## Arquitectura
 
 ```text
 src/
-├── app/
-│   ├── api/
-│   │   ├── builders/saas/route.ts
-│   │   ├── projects/route.ts
-│   │   └── projects/[projectId]/artifacts/[artifactKey]/route.ts
-│   ├── projects/[projectId]/page.tsx
-│   └── page.tsx
-├── components/
-│   └── omniagent/
-│       ├── project-artifact-editor.tsx
-│       └── saas-builder-workbench.tsx
-└── lib/
-    └── omniagent/
-        ├── artifacts.ts
-        ├── agents/registry.ts
-        ├── builders/saas-builder.ts
-        ├── prompts/saas-builder.v1.ts
-        ├── providers/
-        │   ├── index.ts
-        │   ├── local-provider.ts
-        │   ├── openai-provider.ts
-        │   └── types.ts
-        ├── storage/project-store.ts
-        └── types.ts
+  app/
+    api/
+      auth/
+      builders/saas/route.ts
+      feedback/route.ts
+      projects/
+    login/page.tsx
+    projects/[projectId]/page.tsx
+    page.tsx
+  components/
+    omniagent/
+      auth-form.tsx
+      project-artifact-editor.tsx
+      saas-builder-workbench.tsx
+  lib/
+    omniagent/
+      agents/
+      auth/
+      builders/
+      prompts/
+      providers/
+      storage/
+      exports/
+      feedback/
+      workspaces/
+      artifacts.ts
+      types.ts
+prisma/schema.prisma
+supabase/migrations/
 ```
 
-`prisma.config.ts` contiene la URL de base de datos para Prisma 7. El cliente generado se escribe en `src/generated/prisma` y queda fuera de git.
+La UI no contiene prompts ni logica de agentes. El builder usa `src/lib/omniagent/builders/saas-builder.ts`, los providers viven en `src/lib/omniagent/providers`, y la persistencia se resuelve por `src/lib/omniagent/storage/project-store.ts`.
 
 ## Flujo SaaS Builder
 
-1. El usuario completa idea, audiencia, mercado y restricciones.
-2. `POST /api/builders/saas` valida el input.
-3. `runSaaSBuilder` selecciona provider y ejecuta el flujo.
-4. El provider genera el plan estructurado.
-5. El proyecto y la ejecución quedan guardados.
-6. El Command Center muestra resultado e historial.
-7. Cada proyecto puede abrirse en `/projects/[projectId]`.
-8. Los artefactos principales pueden editarse y guardarse como JSON estructurado.
-
-## Artefactos editables
-
-El detalle de proyecto convierte la salida del builder en activos versionables del producto:
-
-- Validación del nicho.
-- Backlog MVP.
-- Landing page.
-- Pricing.
-- Plan de lanzamiento.
-- Plan para primeros clientes y riesgos.
-
-La edición vive en `src/lib/omniagent/artifacts.ts`, no dentro de la UI. Esto permite reemplazar la persistencia local por Prisma/Supabase sin cambiar la experiencia del usuario.
+1. El usuario se registra o inicia sesion.
+2. La app crea/usa su workspace activo.
+3. El usuario completa idea, audiencia, mercado y restricciones.
+4. `POST /api/builders/saas` valida sesion e input.
+5. `runSaaSBuilder` ejecuta el provider seleccionado.
+6. El proyecto se guarda con `workspaceId`.
+7. El Command Center muestra solo historial del workspace activo.
+8. El detalle `/projects/[projectId]` permite editar artefactos guardados.
+9. El usuario exporta Markdown/JSON y deja feedback del piloto.
 
 ## Variables de entorno
 
-Copia `.env.example` a `.env.local`.
+Crea `.env.local` desde `.env.example`.
 
 ```bash
 OMNIAGENT_MODEL_PROVIDER=local
-OMNIAGENT_STORAGE_DRIVER=file
+OMNIAGENT_STORAGE_DRIVER=prisma
+OMNIAGENT_PRIVATE_MVP_PROJECT_LIMIT=5
 OPENAI_MODEL=gpt-5.4-mini
 OPENAI_API_KEY=
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/omniagent
+DATABASE_URL=postgresql://...
+```
+
+Para desarrollo sin base externa puedes usar:
+
+```bash
+OMNIAGENT_STORAGE_DRIVER=file
 ```
 
 Para usar OpenAI:
@@ -90,17 +94,28 @@ OMNIAGENT_MODEL_PROVIDER=openai
 OPENAI_API_KEY=...
 ```
 
-El modelo default recomendado para el adapter es `gpt-5.4-mini`, pero puede cambiarse con `OPENAI_MODEL`.
+No uses secretos en variables `NEXT_PUBLIC_*`.
 
-Para usar Postgres/Supabase como persistencia:
+## Base de datos
 
 ```bash
 OMNIAGENT_STORAGE_DRIVER=prisma
 DATABASE_URL=postgresql://...
 OMNIAGENT_DEFAULT_ORG_ID=   # opcional, ver nota de tenancy abajo
+Prisma usa `prisma/schema.prisma` y genera cliente en `src/generated/prisma`, que no se versiona.
+
+Migracion Supabase versionada:
+
+```text
+supabase/migrations/20260702210000_private_workspace_auth.sql
+supabase/migrations/20260702214000_pilot_feedback_and_limits.sql
 ```
 
-`file` sigue siendo el default para desarrollo local sin credenciales. `prisma` usa el schema de `prisma/schema.prisma` y mantiene el mismo contrato de repositorio.
+Proyecto Supabase actual:
+
+- Ref: `fxnrgzxmhorwpdysclue`
+- URL: `https://fxnrgzxmhorwpdysclue.supabase.co`
+- GitHub: `https://github.com/leomacaris1/OmniAgenteSaaS`
 
 ### Tenancy (multi-usuario)
 
@@ -110,10 +125,11 @@ El schema de Prisma ya incluye `User`, `Organization`, `OrganizationMember` (con
 
 ```bash
 npm install
+npm run prisma:generate
 npm run dev
 ```
 
-Abrir `http://localhost:3000`.
+Abrir `http://localhost:3000`, crear una cuenta y ejecutar SaaS Builder.
 
 Verificaciones:
 
@@ -123,81 +139,16 @@ npm run lint
 npm run build
 ```
 
-## Base de datos
+## Roadmap sano para ingresos
 
-El MVP usa archivo local para acelerar el desarrollo. La app ya tiene una capa `ProjectRepository` para cambiar de persistencia sin tocar las rutas ni la UI.
+1. Cerrar private MVP: auth, workspaces, persistencia y flujo SaaS Builder confiable.
+2. Preparar pilotos pagos: onboarding, cuentas, limites, feedback, export y soporte manual.
+3. Mejorar calidad de output: plantillas por vertical, scoring configurable y comparador de ideas.
+4. Exportar activos avanzados: landing deployable, backlog, roadmap, pricing y plan comercial.
+5. Medir conversion: ideas creadas, proyectos abiertos, artefactos editados y usuarios activos.
+6. Agregar billing cuando haya valor validado con pilotos, no antes.
+7. Expandir builders: Automation Builder, Content Builder y Agent Builder.
 
-Drivers:
+## Proxima prioridad
 
-- `file`: guarda en `data/omniagent.json`.
-- `prisma`: guarda en Postgres/Supabase usando Prisma.
-
-Para preparar el cliente y empujar schema a una base Postgres:
-
-```bash
-cp .env.example .env.local
-npm run prisma:generate
-npm run prisma:push
-```
-
-El proyecto Supabase dedicado debe tener un `DATABASE_URL` servidor-side. No expongas `service_role` ni secretos en variables `NEXT_PUBLIC_*`.
-
-Proyecto actual:
-
-- Supabase ref: `fxnrgzxmhorwpdysclue`
-- Supabase URL: `https://fxnrgzxmhorwpdysclue.supabase.co`
-- GitHub: `https://github.com/leomacaris1/OmniAgenteSaaS`
-
-Nota operativa: en esta máquina no está instalado Supabase CLI. Si se instala, el flujo correcto para migraciones Supabase es crear archivos con `supabase migration new <name>`, no inventar nombres manualmente.
-
-## Plan técnico de 7 días
-
-1. Día 1: cerrar SaaS Builder con outputs consistentes y persistencia local.
-2. Día 2: conectar OpenAI real, streaming y manejo robusto de errores.
-3. Día 3: migrar persistencia a Supabase/PostgreSQL con Prisma.
-4. Día 4: agregar exportación de landing/backlog y edición de artefactos.
-5. Día 5: implementar scoring configurable y comparación de ideas.
-6. Día 6: crear plantillas verticales y primer builder adicional.
-7. Día 7: preparar onboarding, demo, pricing real y pilotos con primeros usuarios.
-
-## Próximas decisiones de producto
-
-- Elegir vertical inicial: micro-SaaS genérico vs. operador para negocios B2B.
-- Definir si el output se vende como software self-serve, servicio asistido o ambos.
-- Agregar cuentas/usuarios antes de compartir demos públicas.
-- Convertir el historial local en workspace multiusuario.
-
-## Getting Started
-
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+El siguiente hito recomendado es **calidad comercial del output**: plantillas por vertical, comparador de ideas y export de landing mas presentable. Eso mejora la probabilidad de cerrar pilotos pagos.
