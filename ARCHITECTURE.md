@@ -1,10 +1,10 @@
 # Arquitectura de OmniAgenteSaaS
 
-> Documento generado a partir de una revisión completa del código en `claude/project-architecture-review-filx1s`. Describe el estado real del MVP, no un plan aspiracional.
+> Documento vivo que describe el estado real del sistema, no un plan aspiracional. Última revisión: post "private workspace auth" + "pilot feedback and exports" (Fase 1 del roadmap completa, parte de la Fase 3 adelantada).
 
 ## 1. Qué es el proyecto
 
-OmniAgent es una plataforma para convertir una idea de negocio en un plan de micro-SaaS: validación de nicho, propuesta de valor, arquitectura técnica, backlog, landing page, pricing, plan de lanzamiento de 7 días y plan de primeros clientes. El MVP actual implementa un único builder: **SaaS Builder**.
+OmniAgent es una plataforma para convertir una idea de negocio en un plan de micro-SaaS: validación de nicho, propuesta de valor, arquitectura técnica, backlog, landing page, pricing, plan de lanzamiento de 7 días y plan de primeros clientes. El MVP actual implementa un único builder: **SaaS Builder**, ahora detrás de un login privado con workspaces por usuario.
 
 Es una app Next.js full-stack (frontend + API routes) sin backend separado. Toda la lógica de dominio vive en `src/lib/omniagent/`.
 
@@ -17,161 +17,154 @@ Es una app Next.js full-stack (frontend + API routes) sin backend separado. Toda
 | UI | Tailwind CSS 4, shadcn/ui (estilo `radix-nova`), Radix UI, lucide-react |
 | Validación | Zod 4 |
 | IA | OpenAI SDK 6 (`responses.create` con `json_schema` estricto) |
-| ORM / DB | Prisma 7 + `@prisma/adapter-pg` sobre PostgreSQL (pensado para Supabase) |
+| ORM / DB | Prisma 7 + `@prisma/adapter-pg` sobre PostgreSQL (Supabase como host) |
+| Auth | Propia: email+contraseña (scrypt), sesiones con token hasheado en DB, cookie `httpOnly` |
 | Testing | Vitest 4 (`src/**/*.test.ts`) |
-| Lint | ESLint 9 (`eslint-config-next`) |
+| Lint / CI | ESLint 9 (`eslint-config-next`), GitHub Actions (`.github/workflows/ci.yml`) |
 
-No hay Docker, CI (`.github/workflows`) ni configuración de despliegue más allá de lo estándar de Next.js/Vercel. `AGENTS.md` advierte que esta versión de Next.js puede tener comportamientos distintos a los conocidos y remite a `node_modules/next/dist/docs/`.
+Node anclado en `.nvmrc` (22) y `engines` (`>=20`). `AGENTS.md` advierte que esta versión de Next.js puede diferir de lo conocido y remite a `node_modules/next/dist/docs/`.
 
 ## 3. Estructura de directorios
 
 ```text
 src/
 ├── app/
-│   ├── page.tsx                                          # Command Center (Home)
-│   ├── layout.tsx
-│   ├── globals.css
-│   ├── projects/[projectId]/page.tsx                     # Detalle + edición de artefactos
+│   ├── page.tsx                                          # Command Center (requiere sesión)
+│   ├── login/page.tsx                                     # Registro / login
+│   ├── projects/[projectId]/page.tsx                      # Detalle + edición de artefactos
 │   └── api/
-│       ├── builders/saas/route.ts                         # POST: ejecuta el builder
-│       ├── projects/route.ts                               # GET: lista proyectos + runs
-│       └── projects/[projectId]/
-│           ├── route.ts                                    # GET: proyecto + artefactos
-│           └── artifacts/[artifactKey]/route.ts             # PATCH: edita un artefacto
+│       ├── auth/{register,login,logout,me}/route.ts        # Auth propia con cookie de sesión
+│       ├── builders/saas/route.ts                          # POST: ejecuta el builder (con límite por workspace)
+│       ├── feedback/route.ts                                # POST: feedback de pilotos
+│       └── projects/
+│           ├── route.ts                                     # GET: proyectos + runs del workspace
+│           └── [projectId]/
+│               ├── route.ts                                 # GET: proyecto + artefactos (scoped)
+│               ├── export/route.ts                           # GET: export Markdown/JSON
+│               └── artifacts/[artifactKey]/route.ts          # PATCH: edita un artefacto (scoped)
 ├── components/
-│   ├── omniagent/
-│   │   ├── saas-builder-workbench.tsx                      # Formulario + resultado + historial
-│   │   └── project-artifact-editor.tsx                     # Editor JSON por artefacto
-│   └── ui/                                                  # Primitivas shadcn (button, card, tabs...)
-└── lib/
-    ├── utils.ts
-    └── omniagent/
-        ├── types.ts                                         # Contrato central: SaaSBuilderOutput, etc.
-        ├── artifacts.ts                                      # Extrae/actualiza artefactos editables
-        ├── agents/registry.ts                                # Catálogo de 10 roles de agente (metadata)
-        ├── builders/saas-builder.ts                          # Orquesta provider + persistencia
-        ├── prompts/saas-builder.v1.ts                        # System prompt versionado
-        ├── providers/
-        │   ├── index.ts                                      # Selector local/openai por env var
-        │   ├── local-provider.ts                             # Generador determinístico sin IA
-        │   ├── openai-provider.ts                             # Adapter real con schema estricto
-        │   └── types.ts
-        └── storage/
-            ├── types.ts                                      # Interfaz ProjectRepository
-            ├── project-store.ts                              # Selector file/prisma por env var
-            ├── file-project-repository.ts                     # Persistencia en data/omniagent.json
-            └── prisma-project-repository.ts                   # Persistencia en Postgres/Supabase
+│   ├── omniagent/  (auth-form, saas-builder-workbench, project-artifact-editor)
+│   └── ui/          # Primitivas shadcn
+└── lib/omniagent/
+    ├── types.ts                    # Contrato central (SaaSBuilderOutput incluye workspaceId?)
+    ├── artifacts.ts                 # Artefactos editables (6 claves)
+    ├── agents/registry.ts           # Catálogo de 10 roles (metadata, no orquestación)
+    ├── builders/saas-builder.ts     # Orquesta provider + persistencia (acepta contexto de workspace)
+    ├── prompts/saas-builder.v1.ts   # Prompt versionado
+    ├── providers/                    # local (determinístico) | openai (json_schema estricto)
+    ├── auth/
+    │   ├── password.ts               # scrypt + timingSafeEqual
+    │   ├── session.ts                 # Cookie httpOnly, token hasheado (sha256) en UserSession, 7 días
+    │   └── repository.ts              # registerUser (crea workspace propio), authenticateUser
+    ├── exports/project-export.ts     # Render Markdown del proyecto
+    ├── feedback/repository.ts        # PilotFeedback (valida pertenencia al workspace)
+    ├── workspaces/limits.ts          # Límite de proyectos por workspace (env, default 5)
+    └── storage/
+        ├── types.ts                   # ProjectRepository + ProjectScope { workspaceId? }
+        ├── prisma-client.ts            # Cliente Prisma compartido (lazy, adapter pg)
+        ├── project-store.ts            # Selector file/prisma por env var
+        ├── file-project-repository.ts   # JSON local con filtro por workspace
+        └── prisma-project-repository.ts # Postgres, queries scoped por workspaceId
 
-prisma/schema.prisma                                          # Modelo de datos relacional
-prisma.config.ts                                               # Config de Prisma 7 (fuera del schema)
+prisma/schema.prisma                 # Modelo completo (ver §6)
+supabase/migrations/*.sql             # 2 migraciones SQL versionadas
 ```
 
-## 4. Flujo de datos (caso de uso principal)
+## 4. Autenticación y tenancy (estado actual)
+
+- **Registro** (`registerUser`): crea `AppUser` (email normalizado, `passwordHash` con scrypt + salt), un `Workspace` propio ("<handle> Workspace") y la membresía `owner`, todo en una transacción.
+- **Sesión**: token aleatorio de 32 bytes; en DB se guarda solo su hash sha256 (`UserSession.tokenHash`) con expiración a 7 días; al cliente viaja en cookie `omniagent_session` (`httpOnly`, `sameSite: lax`, `secure` en producción).
+- **Protección**: las rutas de API y las páginas resuelven `getCurrentSession()`; sin sesión → 401 (API) o redirección a login. Todas las lecturas/escrituras de proyectos pasan un `ProjectScope { workspaceId }`, así cada usuario ve solo los proyectos de su workspace — tanto en el driver `prisma` (cláusulas `where`) como en el `file` (filtro en memoria).
+- **Límites de piloto**: `OMNIAGENT_PRIVATE_MVP_PROJECT_LIMIT` (default 5) se verifica en `POST /api/builders/saas` antes de generar; al alcanzarlo devuelve 403 con el uso actual.
+
+**Decisión registrada**: originalmente se había diseñado tenancy con `User`/`Organization` preparado para **Supabase Auth**. En paralelo se implementó esta auth propia con `AppUser`/`Workspace`, que quedó adoptada como base por ser funcional y cubrir el objetivo del MVP privado. Si más adelante se quiere migrar a Supabase Auth (OAuth, magic links, no gestionar contraseñas propias), el camino es mapear `AppUser` → `auth.users` y reemplazar `session.ts`; la separación en `auth/` lo mantiene localizado.
+
+## 5. Flujo de datos (caso de uso principal)
 
 ```
-Usuario (SaaSBuilderWorkbench)
-   │  submit { idea, audience, region, constraints }
+Login/registro → cookie de sesión
    ▼
-POST /api/builders/saas  ──▶  zod valida input
+POST /api/builders/saas  ── getCurrentSession() → 401 si no hay sesión
+   ├─ zod valida input
+   ├─ countProjects(scope) vs. límite del workspace → 403 si se alcanzó
    ▼
-runSaaSBuilder(input)
+runSaaSBuilder(input, { workspaceId })
    ├─▶ getModelProvider()          → local | openai (env OMNIAGENT_MODEL_PROVIDER)
-   ├─▶ provider.generateSaaSPlan() → genera SaaSBuilderOutput (sin id/createdAt/provider)
-   ├─▶ completa id, createdAt, provider, promptVersion, input
-   └─▶ saveProject(project, run)
-          └─▶ getProjectRepository() → file | prisma (env OMNIAGENT_STORAGE_DRIVER)
-                 ├─ file:   escribe data/omniagent.json (persiste hasta 50 proyectos / 100 runs)
-                 └─ prisma: Project + AgentRun (+ GeneratedArtifact) en Postgres
+   ├─▶ provider.generateSaaSPlan() → plan estructurado
+   ├─▶ completa id, workspaceId, createdAt, provider, promptVersion, input
+   └─▶ saveProject(project, run, { workspaceId })
+          └─▶ file | prisma (env OMNIAGENT_STORAGE_DRIVER)
    ▼
-Respuesta JSON → UI renderiza tabs: Validación / Producto / Arquitectura / Go-to-market / Landing
+UI: tabs de resultado + historial del workspace + export Markdown/JSON + feedback
 ```
-
-Edición de artefactos: `GET /api/projects/[id]` trae `project` + `getEditableArtifacts(project)`; `PATCH /api/projects/[id]/artifacts/[key]` llama `updateProjectArtifact`, que reescribe el campo correspondiente del proyecto (`updateEditableArtifact` en `artifacts.ts`) y persiste de nuevo vía el mismo repositorio.
-
-## 5. Abstracciones clave (los dos "puntos de extensión" del sistema)
-
-### 5.1 `ModelProvider` (IA)
-Interfaz única: `generateSaaSPlan(params) → Promise<SaaSBuilderOutput sin metadata>`.
-- **`local-provider.ts`**: determinístico, basado en heurísticas de texto (detecta vertical por palabras clave: restaurante, inmobiliaria, salud, finanzas, educación). Permite usar la app sin credenciales.
-- **`openai-provider.ts`**: usa `openai.responses.create` con `text.format.json_schema` (`strict: true`) generado desde el mismo `zod` schema que valida la respuesta al parsear. Modelo default `gpt-5.4-mini` (override con `OPENAI_MODEL`).
-- El selector (`providers/index.ts`) usa `import()` dinámico para el adapter de OpenAI, evitando cargar el SDK si no se usa.
-
-### 5.2 `ProjectRepository` (persistencia)
-Interfaz única: `saveProject / listProjects / getProject / updateProjectArtifact / listRuns`.
-- **`file-project-repository.ts`**: JSON plano en `data/omniagent.json` (gitignored), sin locking — no apto para escrituras concurrentes, pero suficiente para desarrollo/demo.
-- **`prisma-project-repository.ts`**: Postgres vía Prisma 7 con adapter `pg`. Guarda el `SaaSBuilderOutput` completo como `Json` en `Project.output` (fuente de verdad) y además desnormaliza cada artefacto editable en `GeneratedArtifact` (para futura consulta granular). Import dinámico del cliente generado (`src/generated/prisma`, fuera de git).
-- El selector (`storage/project-store.ts`) también usa `import()` dinámico para no requerir `DATABASE_URL` si se usa el driver `file`.
-
-Ambos selectores leen `process.env` en cada llamada (no cachean la elección), lo cual es intencional para tests pero significa que cambiar la env var en runtime cambia el comportamiento sin reiniciar el proceso.
 
 ## 6. Modelo de dominio (Prisma)
 
 ```
-Project 1───* AgentRun
-Project 1───* GeneratedArtifact
+Workspace 1───* WorkspaceMember *───1 AppUser
+Workspace 1───* Project 1───* AgentRun
+                Project 1───* GeneratedArtifact
+AppUser  1───* UserSession
+Workspace/AppUser/Project ───* PilotFeedback
 ```
 
-- **Project**: idea + inputs del usuario, `provider`, `promptVersion`, y el `output` completo como JSON (denormalizado).
-- **AgentRun**: registro de ejecución — builder, provider, lista de agentes involucrados, status.
-- **GeneratedArtifact**: copia desnormalizada de cada artefacto editable (`validation`, `backlog`, `landing`, `pricing`, `launch`, `customers`) para permitir edición/consulta independiente del blob `output`.
-- **PromptVersion**: modelo definido en el schema pero **no usado en ningún lado del código actual** — el versionado de prompt real vive hardcodeado en `prompts/saas-builder.v1.ts` (`SAAS_BUILDER_PROMPT_VERSION = "saas-builder.v1"`). Es deuda/planeamiento para un futuro sistema de prompts versionados en DB.
+- **AppUser**: email único, `passwordHash`; **Workspace**: 1 por usuario al registrarse; **WorkspaceMember**: rol como string (default `"owner"`), único por `(userId, workspaceId)`.
+- **Project.workspaceId**: nullable, `onDelete: Cascade`, indexado. El output completo sigue viviendo en `Project.output: Json` como fuente de verdad.
+- **UserSession**: token hasheado, `expiresAt` indexado.
+- **PilotFeedback**: rating opcional 1–5 + mensaje, ligado a workspace/usuario y opcionalmente a un proyecto (validando pertenencia).
+- **PromptVersion**: sigue definido y sin usar (el versionado real es el string en `prompts/saas-builder.v1.ts`).
+- Migraciones: SQL versionado en `supabase/migrations/` (convención del README: `supabase migration new <name>`), además de `prisma db push` para desarrollo.
 
-No hay modelo de `User`, `Organization`, `Account` ni nada de autenticación/multi-tenancy en el schema.
+## 7. API routes
 
-## 7. "Sistema de agentes": qué es realmente
+| Ruta | Método | Auth | Función |
+|---|---|---|---|
+| `/api/auth/register` | POST | — | Alta de usuario + workspace + sesión |
+| `/api/auth/login` | POST | — | Login + sesión |
+| `/api/auth/logout` | POST | cookie | Cierra sesión |
+| `/api/auth/me` | GET | cookie | Usuario + workspace actual |
+| `/api/builders/saas` | POST | cookie | Genera proyecto (respeta límite del workspace) |
+| `/api/projects` | GET | cookie | Proyectos + runs del workspace |
+| `/api/projects/[id]` | GET | cookie | Proyecto + artefactos (404 si no es del workspace) |
+| `/api/projects/[id]/export` | GET | cookie | Export `?format=markdown\|json` |
+| `/api/projects/[id]/artifacts/[key]` | PATCH | cookie | Edita un artefacto (scoped) |
+| `/api/feedback` | POST | cookie | Feedback de piloto (rating + mensaje) |
 
-`agents/registry.ts` define 10 roles (`ceo`, `research`, `business-analyst`, `developer`, `design`, `marketing`, `copywriter`, `sales`, `automation`, `qa`) con nombre y responsabilidad — **son metadata descriptiva, no orquestación real**. No hay 10 llamadas a LLM ni un grafo de agentes: hay **una sola llamada** al provider (local u OpenAI) que devuelve un plan que ya trae asignado un `owner`/`agent` por feature/tarea del backlog. El "core de agentes" en la UI es una función de presentación (`activeAgents = registry.filter(role !== "automation")`), no un pipeline de ejecución.
-`SAAS_BUILDER_AGENT_SEQUENCE` (9 roles, sin `automation`) se persiste en `AgentRun.agents` como trazabilidad de qué roles "participaron" conceptualmente en ese run.
+## 8. "Sistema de agentes": qué es realmente
 
-## 8. API routes
+`agents/registry.ts` define 10 roles con nombre y responsabilidad — **metadata descriptiva, no orquestación**. Hay **una sola llamada** al provider por ejecución; el plan devuelto ya asigna `owner`/`agent` por feature/tarea. `SAAS_BUILDER_AGENT_SEQUENCE` se persiste en `AgentRun.agents` como trazabilidad conceptual.
 
-| Ruta | Método | Función |
-|---|---|---|
-| `/api/builders/saas` | POST | Valida input (zod), ejecuta `runSaaSBuilder`, devuelve el proyecto completo |
-| `/api/projects` | GET | Lista proyectos (máx. 50) + runs (máx. 100) |
-| `/api/projects/[projectId]` | GET | Proyecto + artefactos editables; 404 si no existe |
-| `/api/projects/[projectId]/artifacts/[artifactKey]` | PATCH | Actualiza un artefacto; valida `artifactKey` contra el enum |
-
-Todas usan `NextResponse.json`, manejo de errores con try/catch y status codes explícitos (400/404). No hay autenticación, autorización, rate limiting ni CORS configurado — cualquiera con acceso a la app puede leer/escribir cualquier proyecto.
-
-## 9. Frontend
-
-- **`SaaSBuilderWorkbench`** (`"use client"`, en `/`): formulario controlado (idea/audience/region/constraints con defaults en español), fetch al montar para traer historial, POST al submit, muestra resultado en curso vía `ProjectResult` (tabs: Validación, Producto, Arquitectura, Go-to-market, Landing) y una lista de historial con link a `/projects/[id]`.
-- **`/projects/[projectId]`**: Server Component (`async function`), trae el proyecto server-side con `getProject` + `getEditableArtifacts`, renderiza contexto (idea original, usuarios objetivo) y delega la edición a `ProjectArtifactEditor` (client component, no leído en detalle pero referenciado por `artifacts.ts`).
-- UI: shadcn/ui estilo `radix-nova`, Tailwind 4, iconos `lucide-react`. Todo en español para el usuario final.
-
-## 10. Variables de entorno (`.env.example`)
+## 9. Variables de entorno
 
 ```bash
-OMNIAGENT_MODEL_PROVIDER=local      # local | openai
-OMNIAGENT_STORAGE_DRIVER=file       # file | prisma
+OMNIAGENT_MODEL_PROVIDER=local            # local | openai
+OMNIAGENT_STORAGE_DRIVER=file             # file | prisma
+OMNIAGENT_PRIVATE_MVP_PROJECT_LIMIT=5     # límite de proyectos por workspace
 OPENAI_MODEL=gpt-5.4-mini
 OPENAI_API_KEY=
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/omniagent
+DATABASE_URL=postgresql://...
 ```
 
-Notas del propio README: no exponer `service_role` de Supabase ni secretos en variables `NEXT_PUBLIC_*`; el proyecto Supabase dedicado es `fxnrgzxmhorwpdysclue`; si se usa Supabase CLI, las migraciones deben crearse con `supabase migration new <name>`, no a mano.
+Supabase actual: ref `fxnrgzxmhorwpdysclue`. No exponer secretos en `NEXT_PUBLIC_*`.
 
-## 11. Testing y calidad
+## 10. Testing y CI
 
-- Vitest cubre por ahora solo `src/lib/omniagent/artifacts.test.ts` (lógica pura de extracción/actualización de artefactos). No hay tests de API routes, providers, ni de los repositorios de storage.
-- `predev`/`prebuild`/`prelint`/`pretest` corren `prisma generate` automáticamente — el proyecto asume que el cliente Prisma siempre está actualizado antes de cualquier comando.
-- No hay CI configurado (sin `.github/workflows`).
+- Vitest: `artifacts.test.ts`, `auth/password.test.ts`, `exports/project-export.test.ts`, `workspaces/limits.test.ts`. Sin tests de rutas de API ni repositorios.
+- CI (`.github/workflows/ci.yml`): `npm ci` → `prisma generate` → lint → test → build, en push (`main`, `feature/**`, `claude/**`) y PR a `main`. No necesita secretos: `prisma generate` no se conecta y el build usa drivers default.
+- Convención de ramas y PRs en `CONTRIBUTING.md`. **Pendiente**: activar branch protection en `main` (Settings → Branches) para que el CI verde sea obligatorio.
 
-## 12. Diagnóstico arquitectónico
+## 11. Diagnóstico arquitectónico
 
 **Fortalezas:**
-- Separación limpia por capas: dominio (`types.ts`) → orquestación (`builders/`) → provider/storage intercambiables por interfaz. Cambiar de `local`→`openai` o `file`→`prisma` no toca rutas ni UI, tal como documenta el README.
-- Contrato de salida (`SaaSBuilderOutput`) compartido entre provider local, provider OpenAI (vía zod schema) y UI — reduce drift entre mock y producción.
-- Imports dinámicos evitan cargar `openai` o el cliente Prisma cuando no se usan, manteniendo el arranque liviano en modo `local`/`file`.
+- Separación por capas intacta: dominio → builder → provider/storage intercambiables por interfaz; la auth quedó igualmente encapsulada (`auth/`) y las rutas solo consumen `getCurrentSession()`.
+- Scoping por workspace aplicado de punta a punta (rutas → `ProjectScope` → ambos drivers), no solo en la UI.
+- Criptografía de auth razonable para MVP privado: scrypt con salt, comparación en tiempo constante, tokens de sesión nunca en claro en DB.
 
-**Gaps y riesgos (a decidir como próximos pasos de producto, consistente con lo que el propio README lista en "Próximas decisiones"):**
-1. **Sin autenticación ni multi-tenancy**: todas las API routes son públicas y comparten un único store; no hay `userId`/`orgId` en ningún modelo. Bloqueante antes de compartir demos públicas (ya señalado en el README).
-2. **`file-project-repository` sin locking**: escrituras concurrentes pueden pisarse (read-modify-write sobre un único JSON). Aceptable solo en desarrollo mono-usuario.
-3. **`PromptVersion` en el schema pero no usado**: hoy el versionado de prompts es un string hardcodeado; si se quiere versionado real en DB (A/B de prompts, rollback), falta la integración.
-4. **Sin streaming ni manejo robusto de errores del proveedor OpenAI**: `openai-provider.ts` asume `response.output_text` siempre parseable; un fallo de la API o una respuesta que no cumpla el schema estricto rompe la request sin retry ni fallback a `local`.
-5. **Sin rate limiting/CORS/validación de tamaño de input** más allá del mínimo de 10 caracteres en `idea`.
-6. **Sin CI**: nada corre `lint`/`test`/`build` automáticamente en push/PR.
-7. **`GeneratedArtifact` desnormalizado sin verdadera necesidad actual**: hoy no hay ninguna query que lea de esa tabla en vez de `Project.output`; es preparación a futuro, pero introduce doble escritura que hay que mantener sincronizada manualmente (visible en `writeArtifacts` y en `updateProjectArtifact` del repo Prisma).
-
-Esto es documentación descriptiva del estado actual — no se modificó ningún archivo del código fuente. El documento vive en `ARCHITECTURE.md` en la raíz del repo.
+**Gaps y riesgos a vigilar:**
+1. **`Project.workspaceId` nullable + `onDelete: Cascade`**: proyectos huérfanos son posibles, y borrar un workspace borra silenciosamente todos sus proyectos (el output generado es la única copia del trabajo). Considerar requerido + `Restrict` cuando haya flujo de borrado real.
+2. **`WorkspaceMember.role` como string** (no enum): sin validación a nivel de DB; hoy solo existe `"owner"`.
+3. **Auth propia = responsabilidad propia**: reset de contraseña, verificación de email, rate limiting de login y rotación de sesiones no existen todavía. Sin rate limiting, `/api/auth/login` es fuerza-bruteable.
+4. **`SaaSBuilderOutput.workspaceId`**: metadata de tenancy dentro del tipo de dominio que también modela la salida del LLM (el zod schema del provider OpenAI no lo incluye, así que no se pide al modelo, pero el tipo quedó mezclado).
+5. **`PromptVersion` sigue sin usarse** — conectarlo o eliminarlo.
+6. **Provider OpenAI sin retry/fallback**: un fallo de la API o una respuesta fuera de schema rompe la request (Fase 2 del roadmap).
+7. **`file-project-repository` sin locking**: solo apto para desarrollo mono-proceso.

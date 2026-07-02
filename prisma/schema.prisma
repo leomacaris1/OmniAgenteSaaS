@@ -7,75 +7,7 @@ datasource db {
   provider = "postgresql"
 }
 
-enum Role {
-  OWNER
-  MEMBER
-}
-
-/// CONTRACT: id must equal the corresponding Supabase `auth.users.id` (uuid),
-/// assigned by the app at signup time (e.g. in a Supabase Auth webhook/trigger
-/// handler) — never generated here. Do NOT add `@default(...)` to this field:
-/// doing so breaks the 1:1 identity link with Supabase Auth and orphans any
-/// row created that way. This table does NOT introspect or duplicate
-/// Supabase's `auth` schema — it is OmniAgent's own application-level user
-/// record, kept in sync by id with the Supabase auth user (future phase,
-/// not wired yet).
-model User {
-  id              String               @id
-  email           String               @unique
-  name            String?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  memberships     OrganizationMember[]
-  projectsCreated Project[]            @relation("ProjectCreatedBy")
-}
-
-/// slug "default" is reserved for the auto-created fallback organization used
-/// while there is no auth/session to resolve a real org from (see
-/// src/lib/omniagent/storage/default-organization.ts). When org creation gets
-/// a real UI/API, it must reject "default" as a user-chosen slug to avoid a
-/// unique-constraint collision with that seeded row.
-model Organization {
-  id        String               @id @default(cuid())
-  name      String
-  slug      String               @unique
-  createdAt DateTime             @default(now())
-  updatedAt DateTime             @updatedAt
-  members   OrganizationMember[]
-  projects  Project[]
-}
-
-model OrganizationMember {
-  id             String       @id @default(cuid())
-  organizationId String
-  userId         String
-  role           Role
-  createdAt      DateTime     @default(now())
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([organizationId, userId])
-}
-
 model Project {
-  id              String              @id @default(cuid())
-  organizationId  String
-  createdByUserId String?
-  builderKey      String              @default("saas")
-  title           String
-  idea            String
-  audience        String?
-  region          String?
-  constraints     String?
-  provider        String
-  promptVersion   String
-  output          Json
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  createdByUser   User?               @relation("ProjectCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  runs            AgentRun[]
-  artifacts       GeneratedArtifact[]
   id             String              @id @default(cuid())
   workspaceId    String?
   title          String

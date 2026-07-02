@@ -98,10 +98,6 @@ No uses secretos en variables `NEXT_PUBLIC_*`.
 
 ## Base de datos
 
-```bash
-OMNIAGENT_STORAGE_DRIVER=prisma
-DATABASE_URL=postgresql://...
-OMNIAGENT_DEFAULT_ORG_ID=   # opcional, ver nota de tenancy abajo
 Prisma usa `prisma/schema.prisma` y genera cliente en `src/generated/prisma`, que no se versiona.
 
 Migracion Supabase versionada:
@@ -116,10 +112,6 @@ Proyecto Supabase actual:
 - Ref: `fxnrgzxmhorwpdysclue`
 - URL: `https://fxnrgzxmhorwpdysclue.supabase.co`
 - GitHub: `https://github.com/leomacaris1/OmniAgenteSaaS`
-
-### Tenancy (multi-usuario)
-
-El schema de Prisma ya incluye `User`, `Organization`, `OrganizationMember` (con rol `OWNER`/`MEMBER`) y `Project.organizationId`, preparando el modelo para multi-usuario real. Todavía no hay login (eso llega con Supabase Auth en una fase posterior): mientras tanto, el driver `prisma` asigna cada proyecto nuevo a una organización "default" que se crea automáticamente la primera vez, o a la organización indicada en `OMNIAGENT_DEFAULT_ORG_ID` si se define. El driver `file` no tiene concepto de organización — sigue siendo solo para desarrollo local de un único proceso.
 
 ## Correr localmente
 
