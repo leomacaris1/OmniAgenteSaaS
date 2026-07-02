@@ -1,5 +1,7 @@
 import { updateEditableArtifact, type EditableArtifactKey } from "@/lib/omniagent/artifacts";
 import type { AgentRun, SaaSBuilderOutput } from "@/lib/omniagent/types";
+import type { ProjectRepository, SaveProjectRunInput } from "@/lib/omniagent/storage/types";
+import { getOrCreateDefaultOrganizationId } from "@/lib/omniagent/storage/default-organization";
 import type { ProjectRepository, ProjectScope, SaveProjectRunInput } from "@/lib/omniagent/storage/types";
 import { getPrismaClient } from "@/lib/omniagent/storage/prisma-client";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
@@ -62,12 +64,24 @@ async function writeArtifacts(
 export const prismaProjectRepository: ProjectRepository = {
   async saveProject(project: SaaSBuilderOutput, run: SaveProjectRunInput, scope?: ProjectScope) {
     const prisma = await getPrismaClient();
+    const organizationId = run.organizationId ?? (await getOrCreateDefaultOrganizationId(prisma));
     const workspaceId = scope?.workspaceId ?? project.workspaceId;
     const scopedProject = workspaceId ? { ...project, workspaceId } : project;
 
     await prisma.$transaction(async (tx) => {
       await tx.project.create({
         data: {
+          id: project.id,
+          organizationId,
+          createdByUserId: run.createdByUserId,
+          title: projectTitle(project),
+          idea: project.input.idea,
+          audience: project.input.audience,
+          region: project.input.region,
+          constraints: project.input.constraints,
+          provider: project.provider,
+          promptVersion: project.promptVersion,
+          output: toInputJson(project),
           id: scopedProject.id,
           workspaceId,
           title: projectTitle(scopedProject),

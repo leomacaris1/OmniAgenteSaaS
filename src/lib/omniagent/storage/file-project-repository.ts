@@ -39,7 +39,9 @@ export const fileProjectRepository: ProjectRepository = {
       projectId: scopedProject.id,
       createdAt: new Date().toISOString(),
       status: "completed",
-      ...run,
+      builder: run.builder,
+      provider: run.provider,
+      agents: run.agents,
     };
 
     store.projects = [scopedProject, ...store.projects].slice(0, 50);
