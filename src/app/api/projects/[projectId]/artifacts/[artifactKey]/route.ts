@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCurrentSession } from "@/lib/omniagent/auth/session";
 import { getEditableArtifacts, isEditableArtifactKey } from "@/lib/omniagent/artifacts";
 import { updateProjectArtifact } from "@/lib/omniagent/storage/project-store";
 
@@ -7,6 +8,12 @@ type RouteContext = {
 };
 
 export async function PATCH(request: Request, context: RouteContext) {
+  const session = await getCurrentSession();
+
+  if (!session) {
+    return NextResponse.json({ error: "No autenticado." }, { status: 401 });
+  }
+
   const { projectId, artifactKey } = await context.params;
 
   if (!isEditableArtifactKey(artifactKey)) {
@@ -24,7 +31,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Falta content." }, { status: 400 });
   }
 
-  const project = await updateProjectArtifact(projectId, artifactKey, body.content);
+  const project = await updateProjectArtifact(projectId, artifactKey, body.content, {
+    workspaceId: session.workspace.id,
+  });
 
   if (!project) {
     return NextResponse.json({ error: "Proyecto no encontrado." }, { status: 404 });

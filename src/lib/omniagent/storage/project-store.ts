@@ -1,33 +1,35 @@
 import type { EditableArtifactKey } from "@/lib/omniagent/artifacts";
 import { fileProjectRepository } from "@/lib/omniagent/storage/file-project-repository";
-import type { ProjectRepository } from "@/lib/omniagent/storage/types";
+import type { ProjectRepository, ProjectScope } from "@/lib/omniagent/storage/types";
 import type { AgentRun, SaaSBuilderOutput } from "@/lib/omniagent/types";
 
 export async function saveProject(
   project: SaaSBuilderOutput,
   run: Pick<AgentRun, "builder" | "provider" | "agents">,
+  scope?: ProjectScope,
 ) {
-  return getProjectRepository().saveProject(project, run);
+  return getProjectRepository().saveProject(project, run, scope);
 }
 
-export async function listProjects() {
-  return getProjectRepository().listProjects();
+export async function listProjects(scope?: ProjectScope) {
+  return getProjectRepository().listProjects(scope);
 }
 
-export async function getProject(projectId: string) {
-  return getProjectRepository().getProject(projectId);
+export async function getProject(projectId: string, scope?: ProjectScope) {
+  return getProjectRepository().getProject(projectId, scope);
 }
 
 export async function updateProjectArtifact(
   projectId: string,
   key: EditableArtifactKey,
   content: unknown,
+  scope?: ProjectScope,
 ) {
-  return getProjectRepository().updateProjectArtifact(projectId, key, content);
+  return getProjectRepository().updateProjectArtifact(projectId, key, content, scope);
 }
 
-export async function listRuns() {
-  return getProjectRepository().listRuns();
+export async function listRuns(scope?: ProjectScope) {
+  return getProjectRepository().listRuns(scope);
 }
 
 function getProjectRepository(): ProjectRepository {
@@ -43,9 +45,9 @@ const prismaRepositoryProxy: ProjectRepository = {
     const { prismaProjectRepository } = await import("@/lib/omniagent/storage/prisma-project-repository");
     return prismaProjectRepository.saveProject(...args);
   },
-  async listProjects() {
+  async listProjects(...args) {
     const { prismaProjectRepository } = await import("@/lib/omniagent/storage/prisma-project-repository");
-    return prismaProjectRepository.listProjects();
+    return prismaProjectRepository.listProjects(...args);
   },
   async getProject(...args) {
     const { prismaProjectRepository } = await import("@/lib/omniagent/storage/prisma-project-repository");
@@ -55,8 +57,8 @@ const prismaRepositoryProxy: ProjectRepository = {
     const { prismaProjectRepository } = await import("@/lib/omniagent/storage/prisma-project-repository");
     return prismaProjectRepository.updateProjectArtifact(...args);
   },
-  async listRuns() {
+  async listRuns(...args) {
     const { prismaProjectRepository } = await import("@/lib/omniagent/storage/prisma-project-repository");
-    return prismaProjectRepository.listRuns();
+    return prismaProjectRepository.listRuns(...args);
   },
 };

@@ -7,7 +7,14 @@ import { getModelProvider } from "@/lib/omniagent/providers";
 import { saveProject } from "@/lib/omniagent/storage/project-store";
 import type { SaaSBuilderInput, SaaSBuilderOutput } from "@/lib/omniagent/types";
 
-export async function runSaaSBuilder(input: SaaSBuilderInput): Promise<SaaSBuilderOutput> {
+type SaaSBuilderContext = {
+  workspaceId?: string;
+};
+
+export async function runSaaSBuilder(
+  input: SaaSBuilderInput,
+  context: SaaSBuilderContext = {},
+): Promise<SaaSBuilderOutput> {
   const provider = await getModelProvider();
   const generated = await provider.generateSaaSPlan({
     input,
@@ -18,6 +25,7 @@ export async function runSaaSBuilder(input: SaaSBuilderInput): Promise<SaaSBuild
   const project: SaaSBuilderOutput = {
     ...generated,
     id: crypto.randomUUID(),
+    workspaceId: context.workspaceId,
     createdAt: new Date().toISOString(),
     provider: provider.name,
     promptVersion: SAAS_BUILDER_PROMPT_VERSION,
@@ -28,7 +36,7 @@ export async function runSaaSBuilder(input: SaaSBuilderInput): Promise<SaaSBuild
     builder: "saas",
     provider: provider.name,
     agents: SAAS_BUILDER_AGENT_SEQUENCE,
-  });
+  }, { workspaceId: context.workspaceId });
 
   return project;
 }

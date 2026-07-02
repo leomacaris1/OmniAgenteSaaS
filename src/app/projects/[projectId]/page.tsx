@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, Boxes, Target } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ProjectArtifactEditor } from "@/components/omniagent/project-artifact-editor";
+import { getCurrentSession } from "@/lib/omniagent/auth/session";
 import { getEditableArtifacts } from "@/lib/omniagent/artifacts";
 import { getProject } from "@/lib/omniagent/storage/project-store";
 
@@ -14,8 +15,14 @@ type ProjectPageProps = {
 };
 
 export default async function ProjectPage({ params }: ProjectPageProps) {
+  const session = await getCurrentSession();
+
+  if (!session) {
+    redirect("/login");
+  }
+
   const { projectId } = await params;
-  const project = await getProject(projectId);
+  const project = await getProject(projectId, { workspaceId: session.workspace.id });
 
   if (!project) {
     notFound();

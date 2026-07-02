@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Code2,
   Loader2,
+  LogOut,
   Megaphone,
   Rocket,
   Send,
@@ -23,13 +24,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import type { SaaSBuilderOutput } from "@/lib/omniagent/types";
 import { agentRegistry } from "@/lib/omniagent/agents/registry";
+import type { AuthContext } from "@/lib/omniagent/auth/session";
+import type { SaaSBuilderOutput } from "@/lib/omniagent/types";
 
 type ProjectsResponse = {
   projects: SaaSBuilderOutput[];
@@ -38,11 +40,11 @@ type ProjectsResponse = {
 const defaultIdea =
   "Una plataforma para que negocios de servicios automaticen seguimiento comercial, propuestas y recordatorios de clientes usando agentes IA.";
 
-export function SaaSBuilderWorkbench() {
+export function SaaSBuilderWorkbench({ session }: { session: AuthContext }) {
   const [idea, setIdea] = useState(defaultIdea);
-  const [audience, setAudience] = useState("dueños de negocios de servicios B2B");
-  const [region, setRegion] = useState("LatAm y España");
-  const [constraints, setConstraints] = useState("MVP vendible en 7 días, sin integraciones complejas al inicio");
+  const [audience, setAudience] = useState("duenos de negocios de servicios B2B");
+  const [region, setRegion] = useState("LatAm y Espana");
+  const [constraints, setConstraints] = useState("MVP vendible en 7 dias, sin integraciones complejas al inicio");
   const [project, setProject] = useState<SaaSBuilderOutput | null>(null);
   const [history, setHistory] = useState<SaaSBuilderOutput[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -89,6 +91,11 @@ export function SaaSBuilderWorkbench() {
     }
   }
 
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.assign("/login");
+  }
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
@@ -101,21 +108,28 @@ export function SaaSBuilderWorkbench() {
               </Badge>
               <Badge variant="outline">SaaS Builder</Badge>
               <Badge variant="outline">Provider local por defecto</Badge>
+              <Badge variant="outline">{session.workspace.name}</Badge>
             </div>
             <div>
               <h1 className="text-2xl font-semibold tracking-normal sm:text-3xl">
                 Command Center para crear micro-SaaS
               </h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                Ingresa una idea y OmniAgent genera validación, propuesta, arquitectura, backlog,
+                Ingresa una idea y OmniAgent genera validacion, propuesta, arquitectura, backlog,
                 landing, pricing y plan de lanzamiento con un flujo modular de agentes.
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-right">
-            <Metric label="Proyectos" value={history.length.toString()} />
-            <Metric label="Agentes" value={activeAgents.length.toString()} />
-            <Metric label="Meta" value="7d" />
+          <div className="flex flex-col gap-3 sm:items-end">
+            <div className="grid grid-cols-3 gap-2 text-right">
+              <Metric label="Proyectos" value={history.length.toString()} />
+              <Metric label="Agentes" value={activeAgents.length.toString()} />
+              <Metric label="Meta" value="7d" />
+            </div>
+            <Button type="button" variant="outline" className="w-fit gap-2" onClick={handleLogout}>
+              <LogOut className="h-4 w-4" />
+              Salir
+            </Button>
           </div>
         </header>
 
@@ -216,7 +230,7 @@ export function SaaSBuilderWorkbench() {
                     </Link>
                   ))
                 ) : (
-                  <p className="text-sm text-muted-foreground">Todavía no hay ejecuciones guardadas.</p>
+                  <p className="text-sm text-muted-foreground">Todavia no hay ejecuciones guardadas.</p>
                 )}
               </CardContent>
             </Card>
@@ -244,7 +258,7 @@ function EmptyState() {
         <div>
           <p className="font-medium">Listo para ejecutar el primer builder.</p>
           <p className="mt-1 max-w-md text-sm text-muted-foreground">
-            El resultado aparecerá organizado por validación, negocio, arquitectura, backlog y lanzamiento.
+            El resultado aparecera organizado por validacion, negocio, arquitectura, backlog y lanzamiento.
           </p>
         </div>
       </CardContent>
@@ -274,14 +288,14 @@ function ProjectResult({ project }: { project: SaaSBuilderOutput }) {
           <div className="grid gap-3 md:grid-cols-3">
             <Summary icon={Users} label="Usuarios" value={project.targetUsers.length.toString()} />
             <Summary icon={ClipboardList} label="Backlog" value={project.backlog.length.toString()} />
-            <Summary icon={Rocket} label="Launch" value="7 días" />
+            <Summary icon={Rocket} label="Launch" value="7 dias" />
           </div>
         </CardHeader>
       </Card>
 
       <Tabs defaultValue="validation" className="space-y-4">
         <TabsList className="grid h-auto grid-cols-2 md:grid-cols-5">
-          <TabsTrigger value="validation">Validación</TabsTrigger>
+          <TabsTrigger value="validation">Validacion</TabsTrigger>
           <TabsTrigger value="product">Producto</TabsTrigger>
           <TabsTrigger value="tech">Arquitectura</TabsTrigger>
           <TabsTrigger value="go-to-market">Go-to-market</TabsTrigger>
@@ -291,7 +305,7 @@ function ProjectResult({ project }: { project: SaaSBuilderOutput }) {
         <TabsContent value="validation" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Validación del nicho</CardTitle>
+              <CardTitle className="text-base">Validacion del nicho</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm leading-6 text-muted-foreground">{project.nicheValidation.summary}</p>
@@ -332,12 +346,12 @@ function ProjectResult({ project }: { project: SaaSBuilderOutput }) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Code2 className="h-4 w-4" />
-                Arquitectura técnica
+                Arquitectura tecnica
               </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <ListBlock title="Stack" items={project.technicalArchitecture.stack} />
-              <ListBlock title="Módulos" items={project.technicalArchitecture.modules} />
+              <ListBlock title="Modulos" items={project.technicalArchitecture.modules} />
               <ListBlock title="Datos" items={project.technicalArchitecture.dataModel} />
               <ListBlock title="Integraciones" items={project.technicalArchitecture.integrations} />
             </CardContent>
@@ -350,7 +364,9 @@ function ProjectResult({ project }: { project: SaaSBuilderOutput }) {
               {project.backlog.map((item) => (
                 <div key={item.id} className="rounded-md border border-border p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-medium">{item.id} · {item.title}</p>
+                    <p className="text-sm font-medium">
+                      {item.id} - {item.title}
+                    </p>
                     <Badge variant="outline">{item.estimateDays}d</Badge>
                   </div>
                   <ul className="mt-2 list-inside list-disc text-xs leading-5 text-muted-foreground">
@@ -392,8 +408,10 @@ function ProjectResult({ project }: { project: SaaSBuilderOutput }) {
             <CardContent className="space-y-3">
               {project.launchPlan7Days.map((step) => (
                 <div key={step.day} className="rounded-md border border-border p-3">
-                  <p className="text-sm font-medium">Día {step.day}: {step.goal}</p>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{step.actions.join(" · ")}</p>
+                  <p className="text-sm font-medium">
+                    Dia {step.day}: {step.goal}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{step.actions.join(" - ")}</p>
                 </div>
               ))}
             </CardContent>

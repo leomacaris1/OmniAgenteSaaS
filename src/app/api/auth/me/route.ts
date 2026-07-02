@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/omniagent/auth/session";
-import { listProjects, listRuns } from "@/lib/omniagent/storage/project-store";
 
 export async function GET() {
   const session = await getCurrentSession();
@@ -9,7 +8,5 @@ export async function GET() {
     return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   }
 
-  const scope = { workspaceId: session.workspace.id };
-  const [projects, runs] = await Promise.all([listProjects(scope), listRuns(scope)]);
-  return NextResponse.json({ projects, runs });
+  return NextResponse.json(session);
 }

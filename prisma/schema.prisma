@@ -9,6 +9,7 @@ datasource db {
 
 model Project {
   id             String              @id @default(cuid())
+  workspaceId    String?
   title          String
   idea           String
   audience       String?
@@ -19,8 +20,11 @@ model Project {
   output         Json
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
+  workspace      Workspace?          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   runs           AgentRun[]
   artifacts      GeneratedArtifact[]
+
+  @@index([workspaceId])
 }
 
 model AgentRun {
@@ -53,4 +57,50 @@ model GeneratedArtifact {
   content   Json
   createdAt DateTime @default(now())
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model AppUser {
+  id           String            @id @default(cuid())
+  email        String            @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  sessions     UserSession[]
+  memberships  WorkspaceMember[]
+}
+
+model Workspace {
+  id        String            @id @default(cuid())
+  name      String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  members   WorkspaceMember[]
+  projects  Project[]
+}
+
+model WorkspaceMember {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        String    @default("owner")
+  createdAt   DateTime  @default(now())
+  user        AppUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+}
+
+model UserSession {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  user       AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
