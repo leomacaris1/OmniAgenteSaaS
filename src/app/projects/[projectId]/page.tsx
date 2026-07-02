@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Boxes, Target } from "lucide-react";
+import { ArrowLeft, Boxes, Download, Target } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,6 +59,20 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
               <ProjectMetric label="Backlog" value={project.backlog.length.toString()} />
               <ProjectMetric label="Artefactos" value={artifacts.length.toString()} />
             </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" className="gap-2">
+              <Link href={`/api/projects/${project.id}/export?format=markdown`}>
+                <Download className="h-4 w-4" />
+                Markdown
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="gap-2">
+              <Link href={`/api/projects/${project.id}/export?format=json`}>
+                <Download className="h-4 w-4" />
+                JSON
+              </Link>
+            </Button>
           </div>
         </header>
 

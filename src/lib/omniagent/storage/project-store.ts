@@ -15,6 +15,10 @@ export async function listProjects(scope?: ProjectScope) {
   return getProjectRepository().listProjects(scope);
 }
 
+export async function countProjects(scope?: ProjectScope) {
+  return getProjectRepository().countProjects(scope);
+}
+
 export async function getProject(projectId: string, scope?: ProjectScope) {
   return getProjectRepository().getProject(projectId, scope);
 }
@@ -48,6 +52,10 @@ const prismaRepositoryProxy: ProjectRepository = {
   async listProjects(...args) {
     const { prismaProjectRepository } = await import("@/lib/omniagent/storage/prisma-project-repository");
     return prismaProjectRepository.listProjects(...args);
+  },
+  async countProjects(...args) {
+    const { prismaProjectRepository } = await import("@/lib/omniagent/storage/prisma-project-repository");
+    return prismaProjectRepository.countProjects(...args);
   },
   async getProject(...args) {
     const { prismaProjectRepository } = await import("@/lib/omniagent/storage/prisma-project-repository");

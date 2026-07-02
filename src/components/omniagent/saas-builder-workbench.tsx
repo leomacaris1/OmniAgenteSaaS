@@ -32,9 +32,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { agentRegistry } from "@/lib/omniagent/agents/registry";
 import type { AuthContext } from "@/lib/omniagent/auth/session";
 import type { SaaSBuilderOutput } from "@/lib/omniagent/types";
+import type { WorkspaceUsage } from "@/lib/omniagent/workspaces/limits";
 
 type ProjectsResponse = {
   projects: SaaSBuilderOutput[];
+  usage?: WorkspaceUsage;
 };
 
 const defaultIdea =
@@ -47,7 +49,12 @@ export function SaaSBuilderWorkbench({ session }: { session: AuthContext }) {
   const [constraints, setConstraints] = useState("MVP vendible en 7 dias, sin integraciones complejas al inicio");
   const [project, setProject] = useState<SaaSBuilderOutput | null>(null);
   const [history, setHistory] = useState<SaaSBuilderOutput[]>([]);
+  const [usage, setUsage] = useState<WorkspaceUsage | null>(null);
+  const [feedback, setFeedback] = useState("");
+  const [feedbackRating, setFeedbackRating] = useState("5");
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSendingFeedback, setIsSendingFeedback] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -56,6 +63,7 @@ export function SaaSBuilderWorkbench({ session }: { session: AuthContext }) {
       .then((data: ProjectsResponse) => {
         setHistory(data.projects ?? []);
         setProject((current) => current ?? data.projects?.[0] ?? null);
+        setUsage(data.usage ?? null);
       })
       .catch(() => undefined);
   }, []);
@@ -84,6 +92,15 @@ export function SaaSBuilderWorkbench({ session }: { session: AuthContext }) {
 
       setProject(data);
       setHistory((items) => [data, ...items.filter((item) => item.id !== data.id)]);
+      setUsage((current) =>
+        current
+          ? {
+              ...current,
+              projectCount: current.projectCount + 1,
+              remainingProjects: Math.max(current.remainingProjects - 1, 0),
+            }
+          : current,
+      );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Error inesperado.");
     } finally {
@@ -95,6 +112,38 @@ export function SaaSBuilderWorkbench({ session }: { session: AuthContext }) {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.assign("/login");
   }
+
+  async function handleFeedbackSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFeedbackMessage(null);
+    setIsSendingFeedback(true);
+
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: project?.id,
+          rating: Number.parseInt(feedbackRating, 10),
+          message: feedback,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "No se pudo guardar el feedback.");
+      }
+
+      setFeedback("");
+      setFeedbackMessage("Feedback guardado para revisar el piloto.");
+    } catch (caught) {
+      setFeedbackMessage(caught instanceof Error ? caught.message : "Error inesperado.");
+    } finally {
+      setIsSendingFeedback(false);
+    }
+  }
+
+  const limitReached = usage ? usage.remainingProjects <= 0 : false;
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -124,7 +173,7 @@ export function SaaSBuilderWorkbench({ session }: { session: AuthContext }) {
             <div className="grid grid-cols-3 gap-2 text-right">
               <Metric label="Proyectos" value={history.length.toString()} />
               <Metric label="Agentes" value={activeAgents.length.toString()} />
-              <Metric label="Meta" value="7d" />
+              <Metric label="Restan" value={usage ? usage.remainingProjects.toString() : "-"} />
             </div>
             <Button type="button" variant="outline" className="w-fit gap-2" onClick={handleLogout}>
               <LogOut className="h-4 w-4" />
@@ -171,11 +220,25 @@ export function SaaSBuilderWorkbench({ session }: { session: AuthContext }) {
                       />
                     </div>
                   </div>
-                  <Button type="submit" className="w-full gap-2" disabled={isLoading}>
+                  <Button type="submit" className="w-full gap-2" disabled={isLoading || limitReached}>
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     Ejecutar agentes
                   </Button>
                 </form>
+                {usage ? (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Piloto privado: {usage.projectCount}/{usage.projectLimit} proyectos usados.
+                  </p>
+                ) : null}
+                {limitReached ? (
+                  <Alert className="mt-4">
+                    <AlertTitle>Limite de piloto alcanzado</AlertTitle>
+                    <AlertDescription>
+                      Ya se usaron los proyectos incluidos en este workspace. El siguiente paso comercial es convertir
+                      este piloto en plan pago o ampliar manualmente el limite.
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
                 {error ? (
                   <Alert variant="destructive" className="mt-4">
                     <AlertTitle>Error</AlertTitle>
@@ -202,6 +265,45 @@ export function SaaSBuilderWorkbench({ session }: { session: AuthContext }) {
                     </div>
                   </div>
                 ))}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ClipboardList className="h-4 w-4" />
+                  Feedback del piloto
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form className="space-y-3" onSubmit={handleFeedbackSubmit}>
+                  <div className="space-y-2">
+                    <Label htmlFor="feedback-rating">Valor percibido</Label>
+                    <Input
+                      id="feedback-rating"
+                      type="number"
+                      min="1"
+                      max="5"
+                      value={feedbackRating}
+                      onChange={(event) => setFeedbackRating(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="feedback">Feedback</Label>
+                    <Textarea
+                      id="feedback"
+                      value={feedback}
+                      onChange={(event) => setFeedback(event.target.value)}
+                      className="min-h-28 resize-none"
+                      placeholder="Que faltaria para que esto sea comprable o util en un piloto?"
+                    />
+                  </div>
+                  <Button type="submit" variant="outline" className="w-full gap-2" disabled={isSendingFeedback}>
+                    {isSendingFeedback ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                    Guardar feedback
+                  </Button>
+                </form>
+                {feedbackMessage ? <p className="mt-3 text-xs text-muted-foreground">{feedbackMessage}</p> : null}
               </CardContent>
             </Card>
           </div>

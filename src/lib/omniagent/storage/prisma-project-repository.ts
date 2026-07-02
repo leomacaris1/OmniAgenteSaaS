@@ -106,6 +106,14 @@ export const prismaProjectRepository: ProjectRepository = {
     return projects.map(toProject);
   },
 
+  async countProjects(scope?: ProjectScope) {
+    const prisma = await getPrismaClient();
+
+    return prisma.project.count({
+      where: scope?.workspaceId ? { workspaceId: scope.workspaceId } : undefined,
+    });
+  },
+
   async getProject(projectId: string, scope?: ProjectScope) {
     const prisma = await getPrismaClient();
     const project = await prisma.project.findFirst({

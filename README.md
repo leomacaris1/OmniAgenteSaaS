@@ -9,12 +9,15 @@ Este MVP implementa primero **SaaS Builder**. El usuario ingresa una idea y reci
 - Next.js App Router, React, Tailwind CSS y shadcn/ui.
 - Command Center privado con registro, login, cookie HttpOnly y logout.
 - Workspaces: cada usuario tiene un workspace y solo ve sus proyectos.
+- Limite configurable de proyectos por workspace para pilotos privados.
 - Core modular con agentes, prompts versionados, provider adapter y builder.
 - Provider local deterministico por defecto para trabajar sin credenciales.
 - Adapter OpenAI preparado con `OMNIAGENT_MODEL_PROVIDER=openai`.
 - Persistencia por repositorio intercambiable: archivo local o Prisma/Postgres.
 - Supabase/Postgres conectado para proyectos, ejecuciones, usuarios, sesiones y workspaces.
 - Artefactos editables por proyecto: validacion, backlog, landing, pricing y lanzamiento.
+- Export Markdown/JSON por proyecto.
+- Captura de feedback de pilotos con rating y comentario.
 
 ## Arquitectura
 
@@ -24,6 +27,7 @@ src/
     api/
       auth/
       builders/saas/route.ts
+      feedback/route.ts
       projects/
     login/page.tsx
     projects/[projectId]/page.tsx
@@ -41,6 +45,9 @@ src/
       prompts/
       providers/
       storage/
+      exports/
+      feedback/
+      workspaces/
       artifacts.ts
       types.ts
 prisma/schema.prisma
@@ -59,6 +66,7 @@ La UI no contiene prompts ni logica de agentes. El builder usa `src/lib/omniagen
 6. El proyecto se guarda con `workspaceId`.
 7. El Command Center muestra solo historial del workspace activo.
 8. El detalle `/projects/[projectId]` permite editar artefactos guardados.
+9. El usuario exporta Markdown/JSON y deja feedback del piloto.
 
 ## Variables de entorno
 
@@ -67,6 +75,7 @@ Crea `.env.local` desde `.env.example`.
 ```bash
 OMNIAGENT_MODEL_PROVIDER=local
 OMNIAGENT_STORAGE_DRIVER=prisma
+OMNIAGENT_PRIVATE_MVP_PROJECT_LIMIT=5
 OPENAI_MODEL=gpt-5.4-mini
 OPENAI_API_KEY=
 DATABASE_URL=postgresql://...
@@ -95,6 +104,7 @@ Migracion Supabase versionada:
 
 ```text
 supabase/migrations/20260702210000_private_workspace_auth.sql
+supabase/migrations/20260702214000_pilot_feedback_and_limits.sql
 ```
 
 Proyecto Supabase actual:
@@ -124,13 +134,13 @@ npm run build
 ## Roadmap sano para ingresos
 
 1. Cerrar private MVP: auth, workspaces, persistencia y flujo SaaS Builder confiable.
-2. Mejorar calidad de output: plantillas por vertical, scoring configurable y comparador de ideas.
-3. Exportar activos: landing, backlog, roadmap, pricing y plan comercial en formatos reutilizables.
-4. Preparar pilotos pagos: onboarding, cuentas, limites, feedback y soporte manual.
+2. Preparar pilotos pagos: onboarding, cuentas, limites, feedback, export y soporte manual.
+3. Mejorar calidad de output: plantillas por vertical, scoring configurable y comparador de ideas.
+4. Exportar activos avanzados: landing deployable, backlog, roadmap, pricing y plan comercial.
 5. Medir conversion: ideas creadas, proyectos abiertos, artefactos editados y usuarios activos.
 6. Agregar billing cuando haya valor validado con pilotos, no antes.
 7. Expandir builders: Automation Builder, Content Builder y Agent Builder.
 
 ## Proxima prioridad
 
-El siguiente hito recomendado es **pilotos privados**: onboarding simple, limite de uso por workspace, captura de feedback y export de artefactos. Eso acerca el producto a ingresos sin inflar arquitectura prematuramente.
+El siguiente hito recomendado es **calidad comercial del output**: plantillas por vertical, comparador de ideas y export de landing mas presentable. Eso mejora la probabilidad de cerrar pilotos pagos.

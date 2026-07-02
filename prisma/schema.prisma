@@ -23,6 +23,7 @@ model Project {
   workspace      Workspace?          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   runs           AgentRun[]
   artifacts      GeneratedArtifact[]
+  feedback        PilotFeedback[]
 
   @@index([workspaceId])
 }
@@ -68,6 +69,7 @@ model AppUser {
   updatedAt    DateTime          @updatedAt
   sessions     UserSession[]
   memberships  WorkspaceMember[]
+  feedback     PilotFeedback[]
 }
 
 model Workspace {
@@ -77,6 +79,7 @@ model Workspace {
   updatedAt DateTime          @updatedAt
   members   WorkspaceMember[]
   projects  Project[]
+  feedback  PilotFeedback[]
 }
 
 model WorkspaceMember {
@@ -103,4 +106,21 @@ model UserSession {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+model PilotFeedback {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  projectId   String?
+  rating      Int?
+  message     String
+  status      String    @default("open")
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        AppUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([projectId])
 }

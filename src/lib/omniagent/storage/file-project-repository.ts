@@ -52,6 +52,11 @@ export const fileProjectRepository: ProjectRepository = {
     return store.projects.filter((project) => isProjectInScope(project, scope));
   },
 
+  async countProjects(scope?: ProjectScope) {
+    const store = await readStore();
+    return store.projects.filter((project) => isProjectInScope(project, scope)).length;
+  },
+
   async getProject(projectId: string, scope?: ProjectScope) {
     const store = await readStore();
     return store.projects.find((project) => project.id === projectId && isProjectInScope(project, scope)) ?? null;
