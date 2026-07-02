@@ -12,11 +12,14 @@ enum Role {
   MEMBER
 }
 
-/// id is expected to equal the corresponding Supabase `auth.users.id` (uuid)
-/// once Supabase Auth is wired up in a later phase. This table does NOT
-/// introspect or duplicate Supabase's `auth` schema — it is OmniAgent's own
-/// application-level user record, kept in sync by id with Supabase's auth
-/// user at signup time (future phase).
+/// CONTRACT: id must equal the corresponding Supabase `auth.users.id` (uuid),
+/// assigned by the app at signup time (e.g. in a Supabase Auth webhook/trigger
+/// handler) — never generated here. Do NOT add `@default(...)` to this field:
+/// doing so breaks the 1:1 identity link with Supabase Auth and orphans any
+/// row created that way. This table does NOT introspect or duplicate
+/// Supabase's `auth` schema — it is OmniAgent's own application-level user
+/// record, kept in sync by id with the Supabase auth user (future phase,
+/// not wired yet).
 model User {
   id              String               @id
   email           String               @unique
@@ -27,6 +30,11 @@ model User {
   projectsCreated Project[]            @relation("ProjectCreatedBy")
 }
 
+/// slug "default" is reserved for the auto-created fallback organization used
+/// while there is no auth/session to resolve a real org from (see
+/// src/lib/omniagent/storage/default-organization.ts). When org creation gets
+/// a real UI/API, it must reject "default" as a user-chosen slug to avoid a
+/// unique-constraint collision with that seeded row.
 model Organization {
   id        String               @id @default(cuid())
   name      String
