@@ -97,9 +97,14 @@ Para usar Postgres/Supabase como persistencia:
 ```bash
 OMNIAGENT_STORAGE_DRIVER=prisma
 DATABASE_URL=postgresql://...
+OMNIAGENT_DEFAULT_ORG_ID=   # opcional, ver nota de tenancy abajo
 ```
 
 `file` sigue siendo el default para desarrollo local sin credenciales. `prisma` usa el schema de `prisma/schema.prisma` y mantiene el mismo contrato de repositorio.
+
+### Tenancy (multi-usuario)
+
+El schema de Prisma ya incluye `User`, `Organization`, `OrganizationMember` (con rol `OWNER`/`MEMBER`) y `Project.organizationId`, preparando el modelo para multi-usuario real. Todavía no hay login (eso llega con Supabase Auth en una fase posterior): mientras tanto, el driver `prisma` asigna cada proyecto nuevo a una organización "default" que se crea automáticamente la primera vez, o a la organización indicada en `OMNIAGENT_DEFAULT_ORG_ID` si se define. El driver `file` no tiene concepto de organización — sigue siendo solo para desarrollo local de un único proceso.
 
 ## Correr localmente
 

@@ -7,20 +7,67 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  OWNER
+  MEMBER
+}
+
+/// id is expected to equal the corresponding Supabase `auth.users.id` (uuid)
+/// once Supabase Auth is wired up in a later phase. This table does NOT
+/// introspect or duplicate Supabase's `auth` schema — it is OmniAgent's own
+/// application-level user record, kept in sync by id with Supabase's auth
+/// user at signup time (future phase).
+model User {
+  id              String               @id
+  email           String               @unique
+  name            String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  memberships     OrganizationMember[]
+  projectsCreated Project[]            @relation("ProjectCreatedBy")
+}
+
+model Organization {
+  id        String               @id @default(cuid())
+  name      String
+  slug      String               @unique
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  members   OrganizationMember[]
+  projects  Project[]
+}
+
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  role           Role
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
 model Project {
-  id             String              @id @default(cuid())
-  title          String
-  idea           String
-  audience       String?
-  region         String?
-  constraints    String?
-  provider       String
-  promptVersion  String
-  output         Json
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  runs           AgentRun[]
-  artifacts      GeneratedArtifact[]
+  id              String              @id @default(cuid())
+  organizationId  String
+  createdByUserId String?
+  builderKey      String              @default("saas")
+  title           String
+  idea            String
+  audience        String?
+  region          String?
+  constraints     String?
+  provider        String
+  promptVersion   String
+  output          Json
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdByUser   User?               @relation("ProjectCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  runs            AgentRun[]
+  artifacts       GeneratedArtifact[]
 }
 
 model AgentRun {

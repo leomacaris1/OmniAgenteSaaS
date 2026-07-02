@@ -1,6 +1,7 @@
 import { updateEditableArtifact, type EditableArtifactKey } from "@/lib/omniagent/artifacts";
 import type { AgentRun, SaaSBuilderOutput } from "@/lib/omniagent/types";
 import type { ProjectRepository, SaveProjectRunInput } from "@/lib/omniagent/storage/types";
+import { getOrCreateDefaultOrganizationId } from "@/lib/omniagent/storage/default-organization";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
@@ -77,11 +78,14 @@ async function writeArtifacts(
 export const prismaProjectRepository: ProjectRepository = {
   async saveProject(project: SaaSBuilderOutput, run: SaveProjectRunInput) {
     const prisma = await getPrismaClient();
+    const organizationId = run.organizationId ?? (await getOrCreateDefaultOrganizationId(prisma));
 
     await prisma.$transaction(async (tx) => {
       await tx.project.create({
         data: {
           id: project.id,
+          organizationId,
+          createdByUserId: run.createdByUserId,
           title: projectTitle(project),
           idea: project.input.idea,
           audience: project.input.audience,
