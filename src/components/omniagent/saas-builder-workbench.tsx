@@ -355,16 +355,49 @@ function Metric({ label, value }: { label: string; value: string }) {
 function EmptyState() {
   return (
     <Card>
-      <CardContent className="flex min-h-96 flex-col items-center justify-center gap-3 text-center">
-        <BrainCircuit className="h-10 w-10 text-muted-foreground" />
-        <div>
-          <p className="font-medium">Listo para ejecutar el primer builder.</p>
-          <p className="mt-1 max-w-md text-sm text-muted-foreground">
-            El resultado aparecera organizado por validacion, negocio, arquitectura, backlog y lanzamiento.
-          </p>
+      <CardContent className="flex min-h-96 flex-col justify-center gap-6 py-8">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <BrainCircuit className="h-10 w-10 text-muted-foreground" />
+          <div>
+            <p className="font-medium">Primeros pasos</p>
+            <p className="mt-1 max-w-md text-sm text-muted-foreground">
+              En tres pasos tenes tu primer plan listo para mostrar a un cliente.
+            </p>
+          </div>
         </div>
+        <ol className="mx-auto flex w-full max-w-md flex-col gap-3">
+          <OnboardingStep
+            number="1"
+            title="Ejecuta tu primera idea"
+            body="Usa el formulario de la izquierda. El ejemplo precargado sirve para ver el resultado completo en un minuto."
+          />
+          <OnboardingStep
+            number="2"
+            title="Abri el proyecto y ajustalo"
+            body="Cada seccion (validacion, backlog, landing, pricing) se puede editar a mano o regenerar con IA cambiando la idea."
+          />
+          <OnboardingStep
+            number="3"
+            title="Exporta y entrega"
+            body="Exporta el plan en Markdown o copia la landing y el backlog directo al portapapeles para tu doc de cliente."
+          />
+        </ol>
       </CardContent>
     </Card>
+  );
+}
+
+function OnboardingStep({ number, title, body }: { number: string; title: string; body: string }) {
+  return (
+    <li className="flex gap-3 rounded-md border border-border p-3">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+        {number}
+      </span>
+      <div>
+        <p className="text-sm font-medium">{title}</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{body}</p>
+      </div>
+    </li>
   );
 }
 

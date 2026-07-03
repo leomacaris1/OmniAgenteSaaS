@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/omniagent/auth/session";
 import { countProjects, listProjects, listRuns } from "@/lib/omniagent/storage/project-store";
-import { getWorkspaceUsage } from "@/lib/omniagent/workspaces/limits";
+import { getProjectLimitForPlan, getWorkspaceUsage } from "@/lib/omniagent/workspaces/limits";
 
 export async function GET() {
   const session = await getCurrentSession();
@@ -17,5 +17,9 @@ export async function GET() {
     countProjects(scope),
   ]);
 
-  return NextResponse.json({ projects, runs, usage: getWorkspaceUsage(projectCount) });
+  return NextResponse.json({
+    projects,
+    runs,
+    usage: getWorkspaceUsage(projectCount, getProjectLimitForPlan(session.workspace.plan)),
+  });
 }

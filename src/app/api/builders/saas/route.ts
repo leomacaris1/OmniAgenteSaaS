@@ -3,7 +3,11 @@ import { z } from "zod";
 import { runSaaSBuilder } from "@/lib/omniagent/builders/saas-builder";
 import { getCurrentSession } from "@/lib/omniagent/auth/session";
 import { countProjects } from "@/lib/omniagent/storage/project-store";
-import { getWorkspaceUsage, workspaceCanCreateProject } from "@/lib/omniagent/workspaces/limits";
+import {
+  getProjectLimitForPlan,
+  getWorkspaceUsage,
+  workspaceCanCreateProject,
+} from "@/lib/omniagent/workspaces/limits";
 
 const inputSchema = z.object({
   idea: z.string().trim().min(10, "Describe la idea con al menos 10 caracteres."),
@@ -22,7 +26,10 @@ export async function POST(request: Request) {
 
     const payload = inputSchema.parse(await request.json());
     const scope = { workspaceId: session.workspace.id };
-    const usage = getWorkspaceUsage(await countProjects(scope));
+    const usage = getWorkspaceUsage(
+      await countProjects(scope),
+      getProjectLimitForPlan(session.workspace.plan),
+    );
 
     if (!workspaceCanCreateProject(usage)) {
       return NextResponse.json(

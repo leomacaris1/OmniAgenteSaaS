@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, Loader2, Save, Sparkles } from "lucide-react";
+import { CheckCircle2, Copy, Loader2, Save, Sparkles } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { isEditableArtifactKey, type EditableArtifact } from "@/lib/omniagent/artifacts";
+import { formatBacklogCopy, formatLandingCopy } from "@/lib/omniagent/exports/project-export";
+import type { SaaSBuilderOutput } from "@/lib/omniagent/types";
 
 type ProjectArtifactEditorProps = {
   projectId: string;
@@ -66,6 +68,24 @@ export function ProjectArtifactEditor({
       setError(caught instanceof Error ? caught.message : "Error inesperado.");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function copyArtifact(key: "landing" | "backlog") {
+    setError(null);
+    setMessage(null);
+
+    try {
+      const content = JSON.parse(drafts[key] ?? "null");
+      const text =
+        key === "landing"
+          ? formatLandingCopy(content as SaaSBuilderOutput["landingPage"])
+          : formatBacklogCopy(content as SaaSBuilderOutput["backlog"]);
+
+      await navigator.clipboard.writeText(text);
+      setMessage(key === "landing" ? "Landing copiada al portapapeles." : "Backlog copiado al portapapeles.");
+    } catch {
+      setError("No se pudo copiar. Revisa que el contenido sea JSON valido.");
     }
   }
 
@@ -140,6 +160,17 @@ export function ProjectArtifactEditor({
                 <p className="mt-1 text-sm text-muted-foreground">{artifact.description}</p>
               </div>
               <div className="flex gap-2">
+                {artifact.key === "landing" || artifact.key === "backlog" ? (
+                  <Button
+                    onClick={() => copyArtifact(artifact.key as "landing" | "backlog")}
+                    disabled={isSaving || isRegenerating}
+                    variant="ghost"
+                    className="gap-2"
+                  >
+                    <Copy className="h-4 w-4" />
+                    Copiar
+                  </Button>
+                ) : null}
                 <Button
                   onClick={regenerateArtifact}
                   disabled={isRegenerating || isSaving}

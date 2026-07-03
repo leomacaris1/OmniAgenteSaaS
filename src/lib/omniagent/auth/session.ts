@@ -18,6 +18,7 @@ export type AuthContext = {
     id: string;
     name: string;
     role: string;
+    plan: string;
   };
 };
 
@@ -107,6 +108,7 @@ export async function getCurrentSession(): Promise<AuthContext | null> {
       id: membership.workspace.id,
       name: membership.workspace.name,
       role: membership.role,
+      plan: membership.workspace.plan,
     },
   };
 }

@@ -16,8 +16,12 @@ Este MVP implementa primero **SaaS Builder**. El usuario ingresa una idea y reci
 - Persistencia por repositorio intercambiable: archivo local o Prisma/Postgres.
 - Supabase/Postgres conectado para proyectos, ejecuciones, usuarios, sesiones y workspaces.
 - Artefactos editables por proyecto: validacion, backlog, landing, pricing y lanzamiento.
-- Export Markdown/JSON por proyecto.
+- Export Markdown/JSON por proyecto y copia de landing/backlog al portapapeles.
 - Captura de feedback de pilotos con rating y comentario.
+- Landing publica en `/` para visitantes (vertical: agencias y consultores) con la oferta Founding Pilot.
+- Limite de proyectos por plan de workspace (`founding-pilot`: 20/mes).
+- Onboarding de primeros pasos para usuarios nuevos.
+- Mensajes de venta y guion de demo en `docs/mensajes-de-venta.md`.
 
 ## Arquitectura
 
@@ -75,7 +79,7 @@ Crea `.env.local` desde `.env.example`.
 ```bash
 OMNIAGENT_MODEL_PROVIDER=local
 OMNIAGENT_STORAGE_DRIVER=prisma
-OMNIAGENT_PRIVATE_MVP_PROJECT_LIMIT=5
+OMNIAGENT_PRIVATE_MVP_PROJECT_LIMIT=   # opcional, pisa el limite del plan (solo dev)
 OPENAI_MODEL=gpt-5.4-mini
 OPENAI_API_KEY=
 OPENAI_PRICE_INPUT_PER_1M=0.25
@@ -115,6 +119,7 @@ Migracion Supabase versionada:
 supabase/migrations/20260702210000_private_workspace_auth.sql
 supabase/migrations/20260702214000_pilot_feedback_and_limits.sql
 supabase/migrations/20260703100000_agent_run_telemetry.sql
+supabase/migrations/20260703170000_workspace_plan.sql
 ```
 
 Proyecto Supabase actual:
