@@ -29,7 +29,7 @@ Node anclado en `.nvmrc` (22) y `engines` (`>=20`). `AGENTS.md` advierte que est
 ```text
 src/
 ├── app/
-│   ├── page.tsx                                          # Command Center (requiere sesión)
+│   ├── page.tsx                                          # Landing pública (sin sesión) / Command Center (logueado)
 │   ├── login/page.tsx                                     # Registro / login
 │   ├── projects/[projectId]/page.tsx                      # Detalle + edición de artefactos
 │   └── api/
@@ -44,7 +44,7 @@ src/
 │               ├── regenerate/route.ts                        # POST: regenera una sección con IA
 │               └── artifacts/[artifactKey]/route.ts          # PATCH: edita un artefacto (scoped)
 ├── components/
-│   ├── omniagent/  (auth-form, saas-builder-workbench, project-artifact-editor)
+│   ├── omniagent/  (public-landing, auth-form, saas-builder-workbench, project-artifact-editor)
 │   └── ui/          # Primitivas shadcn
 └── lib/omniagent/
     ├── types.ts                    # Contrato central (SaaSBuilderOutput incluye workspaceId?)
@@ -64,9 +64,9 @@ src/
     │   ├── session.ts                 # Cookie httpOnly, token hasheado (sha256) en UserSession, 7 días
     │   ├── rate-limit.ts               # Sliding window in-memory (login: 5 intentos / 15 min)
     │   └── repository.ts              # registerUser (crea workspace propio), authenticateUser
-    ├── exports/project-export.ts     # Render Markdown del proyecto
+    ├── exports/project-export.ts     # Markdown del proyecto + copy de landing/backlog
     ├── feedback/repository.ts        # PilotFeedback (valida pertenencia al workspace)
-    ├── workspaces/limits.ts          # Límite de proyectos por workspace (env, default 5)
+    ├── workspaces/limits.ts          # Límite de proyectos por plan (founding-pilot: 20; env pisa en dev)
     └── storage/
         ├── types.ts                   # ProjectRepository + ProjectScope { workspaceId? }
         ├── prisma-client.ts            # Cliente Prisma compartido (lazy, adapter pg)
@@ -75,7 +75,7 @@ src/
         └── prisma-project-repository.ts # Postgres, queries scoped por workspaceId
 
 prisma/schema.prisma                 # Modelo completo (ver §6)
-supabase/migrations/*.sql             # 3 migraciones SQL versionadas
+supabase/migrations/*.sql             # 4 migraciones SQL versionadas
 ```
 
 ## 4. Autenticación y tenancy (estado actual)
@@ -83,7 +83,7 @@ supabase/migrations/*.sql             # 3 migraciones SQL versionadas
 - **Registro** (`registerUser`): crea `AppUser` (email normalizado, `passwordHash` con scrypt + salt), un `Workspace` propio ("<handle> Workspace") y la membresía `owner`, todo en una transacción.
 - **Sesión**: token aleatorio de 32 bytes; en DB se guarda solo su hash sha256 (`UserSession.tokenHash`) con expiración a 7 días; al cliente viaja en cookie `omniagent_session` (`httpOnly`, `sameSite: lax`, `secure` en producción).
 - **Protección**: las rutas de API y las páginas resuelven `getCurrentSession()`; sin sesión → 401 (API) o redirección a login. Todas las lecturas/escrituras de proyectos pasan un `ProjectScope { workspaceId }`, así cada usuario ve solo los proyectos de su workspace — tanto en el driver `prisma` (cláusulas `where`) como en el `file` (filtro en memoria).
-- **Límites de piloto**: `OMNIAGENT_PRIVATE_MVP_PROJECT_LIMIT` (default 5) se verifica en `POST /api/builders/saas` antes de generar; al alcanzarlo devuelve 403 con el uso actual.
+- **Límites por plan**: cada `Workspace` tiene un `plan` (default `founding-pilot` → 20 proyectos, mapa en `workspaces/limits.ts`). Se verifica en `POST /api/builders/saas` antes de generar; al alcanzarlo devuelve 403 con el uso actual. `OMNIAGENT_PRIVATE_MVP_PROJECT_LIMIT` (env) pisa cualquier plan, pensado solo para desarrollo.
 
 **Decisión registrada**: originalmente se había diseñado tenancy con `User`/`Organization` preparado para **Supabase Auth**. En paralelo se implementó esta auth propia con `AppUser`/`Workspace`, que quedó adoptada como base por ser funcional y cubrir el objetivo del MVP privado. Si más adelante se quiere migrar a Supabase Auth (OAuth, magic links, no gestionar contraseñas propias), el camino es mapear `AppUser` → `auth.users` y reemplazar `session.ts`; la separación en `auth/` lo mantiene localizado.
 
@@ -124,7 +124,7 @@ AppUser  1───* UserSession
 Workspace/AppUser/Project ───* PilotFeedback
 ```
 
-- **AppUser**: email único, `passwordHash`; **Workspace**: 1 por usuario al registrarse; **WorkspaceMember**: rol como string (default `"owner"`), único por `(userId, workspaceId)`.
+- **AppUser**: email único, `passwordHash`; **Workspace**: 1 por usuario al registrarse, con `plan` comercial (default `"founding-pilot"`); **WorkspaceMember**: rol como string (default `"owner"`), único por `(userId, workspaceId)`.
 - **Project.workspaceId**: nullable, `onDelete: Cascade`, indexado. El output completo sigue viviendo en `Project.output: Json` como fuente de verdad.
 - **UserSession**: token hasheado, `expiresAt` indexado.
 - **PilotFeedback**: rating opcional 1–5 + mensaje, ligado a workspace/usuario y opcionalmente a un proyecto (validando pertenencia).
@@ -157,7 +157,7 @@ Workspace/AppUser/Project ───* PilotFeedback
 ```bash
 OMNIAGENT_MODEL_PROVIDER=local            # local | openai
 OMNIAGENT_STORAGE_DRIVER=file             # file | prisma
-OMNIAGENT_PRIVATE_MVP_PROJECT_LIMIT=5     # límite de proyectos por workspace
+OMNIAGENT_PRIVATE_MVP_PROJECT_LIMIT=      # opcional, pisa el límite del plan (solo dev)
 OPENAI_MODEL=gpt-5.4-mini
 OPENAI_API_KEY=
 OPENAI_PRICE_INPUT_PER_1M=0.25            # para estimar costo por run (informativo)

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { formatProjectMarkdown } from "@/lib/omniagent/exports/project-export";
+import {
+  formatBacklogCopy,
+  formatLandingCopy,
+  formatProjectMarkdown,
+} from "@/lib/omniagent/exports/project-export";
 import type { SaaSBuilderOutput } from "@/lib/omniagent/types";
 
 const project: SaaSBuilderOutput = {
@@ -63,5 +67,21 @@ describe("project export", () => {
     expect(markdown).toContain("- **OA-1** Crear panel inicial");
     expect(markdown).toContain("## Pricing");
     expect(markdown).toContain("USD 99");
+  });
+
+  it("formats landing copy as plain sales text", () => {
+    const copy = formatLandingCopy(project.landingPage);
+
+    expect(copy).toContain("Seguimiento contable sin friccion");
+    expect(copy).toContain("[Solicitar demo]");
+    expect(copy).toContain("## Control");
+    expect(copy).not.toContain("Headline:");
+  });
+
+  it("formats backlog copy ready for a task manager", () => {
+    const copy = formatBacklogCopy(project.backlog);
+
+    expect(copy).toContain("OA-1 — Crear panel inicial (1d, developer)");
+    expect(copy).toContain("  - Lista clientes");
   });
 });

@@ -87,3 +87,35 @@ export function formatProjectMarkdown(project: SaaSBuilderOutput) {
 
   return `${lines.join("\n").trim()}\n`;
 }
+
+/**
+ * Landing lista para pegar en un doc de cliente o en un builder de páginas:
+ * copy plano, sin metadatos técnicos. Recibe la sección (no el proyecto)
+ * para poder usarse desde el editor con el borrador actual.
+ */
+export function formatLandingCopy(landing: SaaSBuilderOutput["landingPage"]) {
+  const lines = [
+    landing.headline,
+    "",
+    landing.subheadline,
+    "",
+    `[${landing.primaryCta}]`,
+    "",
+    ...landing.sections.flatMap((section) => [`## ${section.title}`, "", section.body, ""]),
+  ];
+
+  return `${lines.join("\n").trim()}\n`;
+}
+
+/**
+ * Backlog listo para pegar en un gestor de tareas o un doc de alcance.
+ */
+export function formatBacklogCopy(backlog: SaaSBuilderOutput["backlog"]) {
+  const lines = backlog.flatMap((item) => [
+    `${item.id} — ${item.title} (${item.estimateDays}d, ${item.agent})`,
+    ...item.acceptanceCriteria.map((criterion) => `  - ${criterion}`),
+    "",
+  ]);
+
+  return `${lines.join("\n").trim()}\n`;
+}

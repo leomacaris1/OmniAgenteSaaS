@@ -84,6 +84,10 @@ model AppUser {
 model Workspace {
   id        String            @id @default(cuid())
   name      String
+  /// Plan comercial del workspace. Determina el límite de proyectos
+  /// (ver src/lib/omniagent/workspaces/limits.ts). Sin billing todavía:
+  /// todos los pilotos entran como "founding-pilot".
+  plan      String            @default("founding-pilot")
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   members   WorkspaceMember[]
