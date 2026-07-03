@@ -78,6 +78,8 @@ OMNIAGENT_STORAGE_DRIVER=prisma
 OMNIAGENT_PRIVATE_MVP_PROJECT_LIMIT=5
 OPENAI_MODEL=gpt-5.4-mini
 OPENAI_API_KEY=
+OPENAI_PRICE_INPUT_PER_1M=0.25
+OPENAI_PRICE_OUTPUT_PER_1M=2
 DATABASE_URL=postgresql://...
 ```
 
@@ -94,6 +96,13 @@ OMNIAGENT_MODEL_PROVIDER=openai
 OPENAI_API_KEY=...
 ```
 
+Con OpenAI activo, cada ejecucion reintenta ante errores transitorios y, si el
+provider falla igualmente, cae automaticamente al provider local: el run queda
+registrado con `fallbackFrom`, el error y el costo aproximado en tokens
+(estimado con `OPENAI_PRICE_INPUT_PER_1M` / `OPENAI_PRICE_OUTPUT_PER_1M`).
+Desde el detalle de proyecto se puede regenerar cada seccion con IA, ajustando
+la idea antes de regenerar.
+
 No uses secretos en variables `NEXT_PUBLIC_*`.
 
 ## Base de datos
@@ -105,6 +114,7 @@ Migracion Supabase versionada:
 ```text
 supabase/migrations/20260702210000_private_workspace_auth.sql
 supabase/migrations/20260702214000_pilot_feedback_and_limits.sql
+supabase/migrations/20260703100000_agent_run_telemetry.sql
 ```
 
 Proyecto Supabase actual:

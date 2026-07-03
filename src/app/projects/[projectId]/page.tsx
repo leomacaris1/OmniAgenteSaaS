@@ -109,7 +109,11 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ProjectArtifactEditor projectId={project.id} initialArtifacts={artifacts} />
+              <ProjectArtifactEditor
+                projectId={project.id}
+                initialArtifacts={artifacts}
+                initialIdea={project.input.idea}
+              />
             </CardContent>
           </Card>
         </section>

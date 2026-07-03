@@ -1,14 +1,31 @@
 import type { EditableArtifactKey } from "@/lib/omniagent/artifacts";
 import { fileProjectRepository } from "@/lib/omniagent/storage/file-project-repository";
-import type { ProjectRepository, ProjectScope } from "@/lib/omniagent/storage/types";
-import type { AgentRun, SaaSBuilderOutput } from "@/lib/omniagent/types";
+import type {
+  ProjectRepository,
+  ProjectScope,
+  SaveProjectRunInput,
+  SaveRunInput,
+} from "@/lib/omniagent/storage/types";
+import type { SaaSBuilderOutput } from "@/lib/omniagent/types";
 
 export async function saveProject(
   project: SaaSBuilderOutput,
-  run: Pick<AgentRun, "builder" | "provider" | "agents">,
+  run: SaveProjectRunInput,
   scope?: ProjectScope,
 ) {
   return getProjectRepository().saveProject(project, run, scope);
+}
+
+export async function replaceProject(
+  projectId: string,
+  project: SaaSBuilderOutput,
+  scope?: ProjectScope,
+) {
+  return getProjectRepository().replaceProject(projectId, project, scope);
+}
+
+export async function saveRun(projectId: string, run: SaveRunInput) {
+  return getProjectRepository().saveRun(projectId, run);
 }
 
 export async function listProjects(scope?: ProjectScope) {
@@ -64,6 +81,14 @@ const prismaRepositoryProxy: ProjectRepository = {
   async updateProjectArtifact(...args) {
     const { prismaProjectRepository } = await import("@/lib/omniagent/storage/prisma-project-repository");
     return prismaProjectRepository.updateProjectArtifact(...args);
+  },
+  async replaceProject(...args) {
+    const { prismaProjectRepository } = await import("@/lib/omniagent/storage/prisma-project-repository");
+    return prismaProjectRepository.replaceProject(...args);
+  },
+  async saveRun(...args) {
+    const { prismaProjectRepository } = await import("@/lib/omniagent/storage/prisma-project-repository");
+    return prismaProjectRepository.saveRun(...args);
   },
   async listRuns(...args) {
     const { prismaProjectRepository } = await import("@/lib/omniagent/storage/prisma-project-repository");

@@ -1,6 +1,11 @@
 import { updateEditableArtifact, type EditableArtifactKey } from "@/lib/omniagent/artifacts";
 import type { AgentRun, SaaSBuilderOutput } from "@/lib/omniagent/types";
-import type { ProjectRepository, ProjectScope, SaveProjectRunInput } from "@/lib/omniagent/storage/types";
+import type {
+  ProjectRepository,
+  ProjectScope,
+  SaveProjectRunInput,
+  SaveRunInput,
+} from "@/lib/omniagent/storage/types";
 import { getPrismaClient } from "@/lib/omniagent/storage/prisma-client";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 
@@ -19,6 +24,11 @@ function toRun(record: {
   provider: string;
   agents: string[];
   status: string;
+  fallbackFrom: string | null;
+  errorMessage: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  costUsd: number | null;
   createdAt: Date;
 }): AgentRun {
   return {
@@ -28,7 +38,22 @@ function toRun(record: {
     provider: record.provider as AgentRun["provider"],
     agents: record.agents as AgentRun["agents"],
     status: record.status as AgentRun["status"],
+    fallbackFrom: (record.fallbackFrom as AgentRun["fallbackFrom"]) ?? undefined,
+    errorMessage: record.errorMessage ?? undefined,
+    inputTokens: record.inputTokens ?? undefined,
+    outputTokens: record.outputTokens ?? undefined,
+    costUsd: record.costUsd ?? undefined,
     createdAt: record.createdAt.toISOString(),
+  };
+}
+
+function runTelemetryData(run: SaveProjectRunInput) {
+  return {
+    fallbackFrom: run.fallbackFrom,
+    errorMessage: run.errorMessage,
+    inputTokens: run.inputTokens,
+    outputTokens: run.outputTokens,
+    costUsd: run.costUsd,
   };
 }
 
@@ -85,6 +110,7 @@ export const prismaProjectRepository: ProjectRepository = {
               provider: run.provider,
               agents: run.agents,
               status: "completed",
+              ...runTelemetryData(run),
             },
           },
         },
@@ -159,6 +185,51 @@ export const prismaProjectRepository: ProjectRepository = {
     });
 
     return updatedProject;
+  },
+
+  async replaceProject(projectId: string, project: SaaSBuilderOutput, scope?: ProjectScope) {
+    const prisma = await getPrismaClient();
+    const existing = await prisma.project.findFirst({
+      where: workspaceWhere(projectId, scope),
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return null;
+    }
+
+    await prisma.project.update({
+      where: { id: projectId },
+      data: {
+        title: projectTitle(project),
+        idea: project.input.idea,
+        audience: project.input.audience,
+        region: project.input.region,
+        constraints: project.input.constraints,
+        provider: project.provider,
+        promptVersion: project.promptVersion,
+        output: toInputJson(project),
+      },
+    });
+
+    await writeArtifacts(projectId, project, prisma);
+    return project;
+  },
+
+  async saveRun(projectId: string, run: SaveRunInput) {
+    const prisma = await getPrismaClient();
+
+    await prisma.agentRun.create({
+      data: {
+        id: crypto.randomUUID(),
+        projectId,
+        builder: run.builder,
+        provider: run.provider,
+        agents: run.agents,
+        status: run.status,
+        ...runTelemetryData(run),
+      },
+    });
   },
 
   async listRuns(scope?: ProjectScope) {
