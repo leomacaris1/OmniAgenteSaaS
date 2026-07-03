@@ -41,6 +41,7 @@ src/
 │           └── [projectId]/
 │               ├── route.ts                                 # GET: proyecto + artefactos (scoped)
 │               ├── export/route.ts                           # GET: export Markdown/JSON
+│               ├── regenerate/route.ts                        # POST: regenera una sección con IA
 │               └── artifacts/[artifactKey]/route.ts          # PATCH: edita un artefacto (scoped)
 ├── components/
 │   ├── omniagent/  (auth-form, saas-builder-workbench, project-artifact-editor)
@@ -49,12 +50,19 @@ src/
     ├── types.ts                    # Contrato central (SaaSBuilderOutput incluye workspaceId?)
     ├── artifacts.ts                 # Artefactos editables (6 claves)
     ├── agents/registry.ts           # Catálogo de 10 roles (metadata, no orquestación)
-    ├── builders/saas-builder.ts     # Orquesta provider + persistencia (acepta contexto de workspace)
-    ├── prompts/saas-builder.v1.ts   # Prompt versionado
-    ├── providers/                    # local (determinístico) | openai (json_schema estricto)
+    ├── builders/saas-builder.ts     # Orquesta provider (con fallback) + persistencia
+    ├── prompts/                      # saas-builder.v1 (histórico) y v2 (activo, con rúbrica de score)
+    ├── providers/
+    │   ├── local-provider.ts          # Determinístico, sin credenciales; también regenera secciones
+    │   ├── openai-provider.ts          # responses API + json_schema estricto, con retry
+    │   ├── plan-schema.ts               # Zod del plan y de cada sección + sanitizado del wire schema
+    │   ├── fallback.ts                   # openai→local con telemetría (fallbackFrom, error, costo)
+    │   ├── retry.ts                       # Reintentos con backoff según status HTTP
+    │   └── openai-cost.ts                  # Costo aproximado por tokens (precios via env)
     ├── auth/
     │   ├── password.ts               # scrypt + timingSafeEqual
     │   ├── session.ts                 # Cookie httpOnly, token hasheado (sha256) en UserSession, 7 días
+    │   ├── rate-limit.ts               # Sliding window in-memory (login: 5 intentos / 15 min)
     │   └── repository.ts              # registerUser (crea workspace propio), authenticateUser
     ├── exports/project-export.ts     # Render Markdown del proyecto
     ├── feedback/repository.ts        # PilotFeedback (valida pertenencia al workspace)
@@ -67,7 +75,7 @@ src/
         └── prisma-project-repository.ts # Postgres, queries scoped por workspaceId
 
 prisma/schema.prisma                 # Modelo completo (ver §6)
-supabase/migrations/*.sql             # 2 migraciones SQL versionadas
+supabase/migrations/*.sql             # 3 migraciones SQL versionadas
 ```
 
 ## 4. Autenticación y tenancy (estado actual)
@@ -90,13 +98,21 @@ POST /api/builders/saas  ── getCurrentSession() → 401 si no hay sesión
    ▼
 runSaaSBuilder(input, { workspaceId })
    ├─▶ getModelProvider()          → local | openai (env OMNIAGENT_MODEL_PROVIDER)
-   ├─▶ provider.generateSaaSPlan() → plan estructurado
-   ├─▶ completa id, workspaceId, createdAt, provider, promptVersion, input
-   └─▶ saveProject(project, run, { workspaceId })
+   ├─▶ generatePlanWithFallback()  → openai (con retry) y, si falla, local;
+   │      la telemetría del run registra fallbackFrom, error, tokens y costo
+   ├─▶ completa id, workspaceId, createdAt, provider (el que realmente corrió),
+   │      promptVersion (saas-builder.v2), input
+   └─▶ saveProject(project, run + telemetría, { workspaceId })
           └─▶ file | prisma (env OMNIAGENT_STORAGE_DRIVER)
    ▼
 UI: tabs de resultado + historial del workspace + export Markdown/JSON + feedback
 ```
+
+Regeneración por sección: `POST /api/projects/[id]/regenerate` recibe `artifactKey`
+y una `idea` opcional (editada en el detalle del proyecto); regenera solo esa
+sección con el mismo esquema de fallback, persiste el proyecto completo
+(`replaceProject`, incluyendo la idea nueva) y registra un `AgentRun` adicional
+con la telemetría de esa regeneración.
 
 ## 6. Modelo de dominio (Prisma)
 
@@ -112,7 +128,8 @@ Workspace/AppUser/Project ───* PilotFeedback
 - **Project.workspaceId**: nullable, `onDelete: Cascade`, indexado. El output completo sigue viviendo en `Project.output: Json` como fuente de verdad.
 - **UserSession**: token hasheado, `expiresAt` indexado.
 - **PilotFeedback**: rating opcional 1–5 + mensaje, ligado a workspace/usuario y opcionalmente a un proyecto (validando pertenencia).
-- **PromptVersion**: sigue definido y sin usar (el versionado real es el string en `prompts/saas-builder.v1.ts`).
+- **AgentRun** ahora incluye telemetría: `fallbackFrom`, `errorMessage`, `inputTokens`, `outputTokens`, `costUsd` (aproximado, no fuente de facturación).
+- **PromptVersion**: sigue definido y sin usar (el versionado real es el string en `prompts/saas-builder.v2.ts`, activo; `v1` queda como histórico).
 - Migraciones: SQL versionado en `supabase/migrations/` (convención del README: `supabase migration new <name>`), además de `prisma db push` para desarrollo.
 
 ## 7. API routes
@@ -120,13 +137,14 @@ Workspace/AppUser/Project ───* PilotFeedback
 | Ruta | Método | Auth | Función |
 |---|---|---|---|
 | `/api/auth/register` | POST | — | Alta de usuario + workspace + sesión |
-| `/api/auth/login` | POST | — | Login + sesión |
+| `/api/auth/login` | POST | — | Login + sesión (rate limit: 5 intentos / 15 min por email+IP) |
 | `/api/auth/logout` | POST | cookie | Cierra sesión |
 | `/api/auth/me` | GET | cookie | Usuario + workspace actual |
 | `/api/builders/saas` | POST | cookie | Genera proyecto (respeta límite del workspace) |
 | `/api/projects` | GET | cookie | Proyectos + runs del workspace |
 | `/api/projects/[id]` | GET | cookie | Proyecto + artefactos (404 si no es del workspace) |
 | `/api/projects/[id]/export` | GET | cookie | Export `?format=markdown\|json` |
+| `/api/projects/[id]/regenerate` | POST | cookie | Regenera una sección con IA (idea editable, con fallback) |
 | `/api/projects/[id]/artifacts/[key]` | PATCH | cookie | Edita un artefacto (scoped) |
 | `/api/feedback` | POST | cookie | Feedback de piloto (rating + mensaje) |
 
@@ -142,6 +160,8 @@ OMNIAGENT_STORAGE_DRIVER=file             # file | prisma
 OMNIAGENT_PRIVATE_MVP_PROJECT_LIMIT=5     # límite de proyectos por workspace
 OPENAI_MODEL=gpt-5.4-mini
 OPENAI_API_KEY=
+OPENAI_PRICE_INPUT_PER_1M=0.25            # para estimar costo por run (informativo)
+OPENAI_PRICE_OUTPUT_PER_1M=2
 DATABASE_URL=postgresql://...
 ```
 
@@ -149,7 +169,7 @@ Supabase actual: ref `fxnrgzxmhorwpdysclue`. No exponer secretos en `NEXT_PUBLIC
 
 ## 10. Testing y CI
 
-- Vitest: `artifacts.test.ts`, `auth/password.test.ts`, `exports/project-export.test.ts`, `workspaces/limits.test.ts`. Sin tests de rutas de API ni repositorios.
+- Vitest: `artifacts`, `auth/password`, `auth/rate-limit`, `exports/project-export`, `workspaces/limits`, `providers/fallback`, `providers/openai-cost`, `providers/plan-schema`. Sin tests de rutas de API ni repositorios.
 - CI (`.github/workflows/ci.yml`): `npm ci` → `prisma generate` → lint → test → build, en push (`main`, `feature/**`, `claude/**`) y PR a `main`. No necesita secretos: `prisma generate` no se conecta y el build usa drivers default.
 - Convención de ramas y PRs en `CONTRIBUTING.md`. **Pendiente**: activar branch protection en `main` (Settings → Branches) para que el CI verde sea obligatorio.
 
@@ -163,8 +183,9 @@ Supabase actual: ref `fxnrgzxmhorwpdysclue`. No exponer secretos en `NEXT_PUBLIC
 **Gaps y riesgos a vigilar:**
 1. **`Project.workspaceId` nullable + `onDelete: Cascade`**: proyectos huérfanos son posibles, y borrar un workspace borra silenciosamente todos sus proyectos (el output generado es la única copia del trabajo). Considerar requerido + `Restrict` cuando haya flujo de borrado real.
 2. **`WorkspaceMember.role` como string** (no enum): sin validación a nivel de DB; hoy solo existe `"owner"`.
-3. **Auth propia = responsabilidad propia**: reset de contraseña, verificación de email, rate limiting de login y rotación de sesiones no existen todavía. Sin rate limiting, `/api/auth/login` es fuerza-bruteable.
+3. **Auth propia = responsabilidad propia**: reset de contraseña, verificación de email y rotación de sesiones no existen todavía. El login ya tiene rate limiting (5 intentos / 15 min por email+IP), pero es **in-memory**: con más de una instancia cada proceso cuenta por separado — mover a un store compartido antes de escalar horizontalmente.
 4. **`SaaSBuilderOutput.workspaceId`**: metadata de tenancy dentro del tipo de dominio que también modela la salida del LLM (el zod schema del provider OpenAI no lo incluye, así que no se pide al modelo, pero el tipo quedó mezclado).
 5. **`PromptVersion` sigue sin usarse** — conectarlo o eliminarlo.
-6. **Provider OpenAI sin retry/fallback**: un fallo de la API o una respuesta fuera de schema rompe la request (Fase 2 del roadmap).
+6. **Costo por run es una estimación**: se calcula con precios configurados por env (`OPENAI_PRICE_*`), no con datos de facturación reales; revisar los defaults cuando cambie el modelo o su pricing.
 7. **`file-project-repository` sin locking**: solo apto para desarrollo mono-proceso.
+8. **Regeneración por sección sin control de concurrencia**: dos regeneraciones simultáneas del mismo proyecto pueden pisarse (last-write-wins sobre `Project.output`). Aceptable mono-usuario; revisar si aparece colaboración real.

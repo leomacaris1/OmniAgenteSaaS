@@ -1,59 +1,18 @@
 import OpenAI from "openai";
 import { z } from "zod";
-import type { ModelProvider } from "@/lib/omniagent/providers/types";
-
-const planSchema = z.object({
-  nicheValidation: z.object({
-    verdict: z.enum(["promising", "needs-focus", "risky"]),
-    score: z.number().min(0).max(100),
-    summary: z.string(),
-    marketSignals: z.array(z.object({
-      label: z.string(),
-      strength: z.enum(["low", "medium", "high"]),
-      rationale: z.string(),
-    })),
-  }),
-  valueProposition: z.string(),
-  targetUsers: z.array(z.string()),
-  mvpFeatures: z.array(z.object({
-    name: z.string(),
-    priority: z.enum(["P0", "P1", "P2"]),
-    owner: z.enum(["ceo", "research", "business-analyst", "developer", "design", "marketing", "copywriter", "sales", "automation", "qa"]),
-    outcome: z.string(),
-  })),
-  technicalArchitecture: z.object({
-    stack: z.array(z.string()),
-    modules: z.array(z.string()),
-    dataModel: z.array(z.string()),
-    integrations: z.array(z.string()),
-  }),
-  backlog: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    agent: z.enum(["ceo", "research", "business-analyst", "developer", "design", "marketing", "copywriter", "sales", "automation", "qa"]),
-    estimateDays: z.number(),
-    acceptanceCriteria: z.array(z.string()),
-  })),
-  landingPage: z.object({
-    headline: z.string(),
-    subheadline: z.string(),
-    primaryCta: z.string(),
-    sections: z.array(z.object({ title: z.string(), body: z.string() })),
-  }),
-  pricing: z.array(z.object({
-    name: z.string(),
-    price: z.string(),
-    target: z.string(),
-    includes: z.array(z.string()),
-  })),
-  launchPlan7Days: z.array(z.object({
-    day: z.number(),
-    goal: z.string(),
-    actions: z.array(z.string()),
-  })),
-  firstCustomerPlan: z.array(z.string()),
-  risks: z.array(z.string()),
-});
+import { estimateCostUsd } from "@/lib/omniagent/providers/openai-cost";
+import {
+  planSchema,
+  sectionSchemas,
+  toWireJsonSchema,
+} from "@/lib/omniagent/providers/plan-schema";
+import { withRetries } from "@/lib/omniagent/providers/retry";
+import type {
+  GenerateSaaSPlanParams,
+  ModelProvider,
+  ProviderUsage,
+  RegenerateSectionParams,
+} from "@/lib/omniagent/providers/types";
 
 let client: OpenAI | null = null;
 
@@ -66,31 +25,87 @@ function getOpenAIClient() {
   return client;
 }
 
-export const openAIProvider: ModelProvider = {
-  name: "openai",
-  async generateSaaSPlan({ input, systemPrompt }) {
-    const response = await getOpenAIClient().responses.create({
-      model: process.env.OPENAI_MODEL || "gpt-5.4-mini",
+function getModel() {
+  return process.env.OPENAI_MODEL || "gpt-5.4-mini";
+}
+
+function toUsage(response: { usage?: { input_tokens?: number; output_tokens?: number } | null }): ProviderUsage {
+  const inputTokens = response.usage?.input_tokens;
+  const outputTokens = response.usage?.output_tokens;
+
+  return {
+    inputTokens,
+    outputTokens,
+    costUsd: estimateCostUsd(inputTokens, outputTokens),
+  };
+}
+
+async function createStructuredResponse(params: {
+  systemPrompt: string;
+  userContent: string;
+  schemaName: string;
+  wireSchema: Record<string, unknown>;
+}) {
+  return withRetries(() =>
+    getOpenAIClient().responses.create({
+      model: getModel(),
       input: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: JSON.stringify({
-            task: "Generate an OmniAgent SaaS Builder plan",
-            input,
-          }),
-        },
+        { role: "system", content: params.systemPrompt },
+        { role: "user", content: params.userContent },
       ],
       text: {
         format: {
           type: "json_schema",
-          name: "saas_builder_plan",
-          schema: z.toJSONSchema(planSchema),
+          name: params.schemaName,
+          schema: params.wireSchema,
           strict: true,
         },
       },
+    }),
+  );
+}
+
+export const openAIProvider: ModelProvider = {
+  name: "openai",
+
+  async generateSaaSPlan({ input, systemPrompt }: GenerateSaaSPlanParams) {
+    const response = await createStructuredResponse({
+      systemPrompt,
+      userContent: JSON.stringify({
+        task: "Generate an OmniAgent SaaS Builder plan",
+        input,
+      }),
+      schemaName: "saas_builder_plan",
+      wireSchema: toWireJsonSchema(planSchema),
     });
 
-    return planSchema.parse(JSON.parse(response.output_text));
+    return {
+      plan: planSchema.parse(JSON.parse(response.output_text)),
+      usage: toUsage(response),
+    };
+  },
+
+  async regenerateSection({ input, artifactKey, currentContent, systemPrompt }: RegenerateSectionParams) {
+    const sectionSchema = sectionSchemas[artifactKey];
+    // json_schema requires an object root; array sections get wrapped.
+    const wrappedSchema = z.object({ content: sectionSchema });
+
+    const response = await createStructuredResponse({
+      systemPrompt,
+      userContent: JSON.stringify({
+        task: `Regenerate only the "${artifactKey}" section of an existing OmniAgent SaaS Builder plan. Return a materially improved version, keeping it consistent with the project input.`,
+        input,
+        currentContent,
+      }),
+      schemaName: `saas_builder_section_${artifactKey}`,
+      wireSchema: toWireJsonSchema(wrappedSchema),
+    });
+
+    const parsed = wrappedSchema.parse(JSON.parse(response.output_text));
+
+    return {
+      content: parsed.content,
+      usage: toUsage(response),
+    };
   },
 };

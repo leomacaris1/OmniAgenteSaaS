@@ -59,7 +59,14 @@ export function getEditableArtifacts(project: SaaSBuilderOutput): EditableArtifa
   }));
 }
 
-export function getArtifactContent(project: SaaSBuilderOutput, key: EditableArtifactKey) {
+/// The subset of plan fields artifacts are extracted from — satisfied both by
+/// a persisted SaaSBuilderOutput and by a provider's freshly generated plan.
+export type ArtifactSource = Pick<
+  SaaSBuilderOutput,
+  "nicheValidation" | "backlog" | "landingPage" | "pricing" | "launchPlan7Days" | "firstCustomerPlan" | "risks"
+>;
+
+export function getArtifactContent(project: ArtifactSource, key: EditableArtifactKey) {
   switch (key) {
     case "validation":
       return project.nicheValidation;

@@ -29,14 +29,23 @@ model Project {
 }
 
 model AgentRun {
-  id        String   @id @default(cuid())
-  projectId String
-  builder   String
-  provider  String
-  agents    String[]
-  status    String
-  createdAt DateTime @default(now())
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  projectId    String
+  builder      String
+  provider     String
+  agents       String[]
+  status       String
+  /// Provider originally requested when this run fell back (e.g. "openai"
+  /// when OpenAI failed and the local provider completed the run).
+  fallbackFrom String?
+  errorMessage String?
+  inputTokens  Int?
+  outputTokens Int?
+  /// Approximate cost estimated from token usage and the configured
+  /// per-million-token prices — not a billing source of truth.
+  costUsd      Float?
+  createdAt    DateTime @default(now())
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model PromptVersion {

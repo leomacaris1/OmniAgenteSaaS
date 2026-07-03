@@ -93,7 +93,15 @@ export type SaaSBuilderOutput = {
   risks: string[];
 };
 
-export type AgentRun = {
+export type RunTelemetry = {
+  fallbackFrom?: ProviderName;
+  errorMessage?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  costUsd?: number;
+};
+
+export type AgentRun = RunTelemetry & {
   id: string;
   projectId: string;
   createdAt: string;

@@ -1,4 +1,10 @@
-import type { ModelProvider } from "@/lib/omniagent/providers/types";
+import { getArtifactContent } from "@/lib/omniagent/artifacts";
+import type {
+  GeneratedSaaSPlan,
+  ModelProvider,
+  RegenerateSectionParams,
+} from "@/lib/omniagent/providers/types";
+import type { SaaSBuilderInput } from "@/lib/omniagent/types";
 
 function titleFromIdea(idea: string) {
   const clean = idea.trim().replace(/\s+/g, " ");
@@ -15,10 +21,8 @@ function inferVertical(idea: string) {
   return "operaciones B2B";
 }
 
-export const localProvider: ModelProvider = {
-  name: "local",
-  async generateSaaSPlan({ input }) {
-    const ideaTitle = titleFromIdea(input.idea);
+function buildPlan(input: SaaSBuilderInput): GeneratedSaaSPlan {
+  const ideaTitle = titleFromIdea(input.idea);
     const vertical = inferVertical(input.idea);
     const audience = input.audience?.trim() || `equipos pequeños de ${vertical}`;
     const region = input.region?.trim() || "mercados hispanohablantes";
@@ -187,5 +191,16 @@ export const localProvider: ModelProvider = {
         "Construir integraciones antes de validar el workflow central.",
       ],
     };
+}
+
+export const localProvider: ModelProvider = {
+  name: "local",
+
+  async generateSaaSPlan({ input }) {
+    return { plan: buildPlan(input) };
+  },
+
+  async regenerateSection({ input, artifactKey }: RegenerateSectionParams) {
+    return { content: getArtifactContent(buildPlan(input), artifactKey) };
   },
 };

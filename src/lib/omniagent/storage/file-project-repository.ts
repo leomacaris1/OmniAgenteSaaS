@@ -2,7 +2,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { updateEditableArtifact } from "@/lib/omniagent/artifacts";
 import type { AgentRun, SaaSBuilderOutput } from "@/lib/omniagent/types";
-import type { ProjectRepository, ProjectScope, SaveProjectRunInput } from "@/lib/omniagent/storage/types";
+import type {
+  ProjectRepository,
+  ProjectScope,
+  SaveProjectRunInput,
+  SaveRunInput,
+} from "@/lib/omniagent/storage/types";
 
 type OmniAgentStore = {
   projects: SaaSBuilderOutput[];
@@ -76,6 +81,34 @@ export const fileProjectRepository: ProjectRepository = {
     store.projects[projectIndex] = updatedProject;
     await writeStore(store);
     return updatedProject;
+  },
+
+  async replaceProject(projectId, project, scope) {
+    const store = await readStore();
+    const projectIndex = store.projects.findIndex(
+      (candidate) => candidate.id === projectId && isProjectInScope(candidate, scope),
+    );
+
+    if (projectIndex === -1) {
+      return null;
+    }
+
+    store.projects[projectIndex] = project;
+    await writeStore(store);
+    return project;
+  },
+
+  async saveRun(projectId: string, run: SaveRunInput) {
+    const store = await readStore();
+    const agentRun: AgentRun = {
+      id: crypto.randomUUID(),
+      projectId,
+      createdAt: new Date().toISOString(),
+      ...run,
+    };
+
+    store.runs = [agentRun, ...store.runs].slice(0, 100);
+    await writeStore(store);
   },
 
   async listRuns(scope?: ProjectScope) {
