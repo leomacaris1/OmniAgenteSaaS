@@ -31,6 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { agentRegistry } from "@/lib/omniagent/agents/registry";
 import type { AuthContext } from "@/lib/omniagent/auth/session";
+import { appRoutes } from "@/lib/omniagent/navigation/routes";
 import type { SaaSBuilderOutput } from "@/lib/omniagent/types";
 import type { WorkspaceUsage } from "@/lib/omniagent/workspaces/limits";
 
@@ -110,7 +111,7 @@ export function SaaSBuilderWorkbench({ session }: { session: AuthContext }) {
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    window.location.assign("/login");
+    window.location.assign(appRoutes.login);
   }
 
   async function handleFeedbackSubmit(event: FormEvent<HTMLFormElement>) {

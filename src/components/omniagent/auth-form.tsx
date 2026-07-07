@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { appRoutes } from "@/lib/omniagent/navigation/routes";
 
 type AuthMode = "login" | "register";
 
@@ -36,7 +37,7 @@ export function AuthForm() {
         throw new Error(data.error ?? "No se pudo iniciar la sesion.");
       }
 
-      window.location.assign("/");
+      window.location.assign(appRoutes.commandCenter);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Error inesperado.");
     } finally {
