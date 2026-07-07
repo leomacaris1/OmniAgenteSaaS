@@ -41,5 +41,14 @@ The verdict must follow the score: 70+ "promising", 45-69 "needs-focus", below 4
 - firstCustomerPlan: an operator could execute it tomorrow without further research.
 - risks: name the failure modes of THIS idea, not generic startup risks.
 
+## Sensitive audiences and regulated claims
+
+If the idea involves children, health, neurodiversity, ADHD/TDAH, therapy, education support, finance, legal, or other sensitive contexts:
+- Do not position the product as diagnosis, treatment, cure, medical advice, or replacement for licensed professionals.
+- Prefer "educational support", "assistive content", "caregiver/teacher workflow", and "professional-reviewed templates".
+- Include privacy, consent, age-appropriate design, moderation, and expert validation in risks or architecture.
+- Lower the score if the buyer, compliance path, or professional validation is unclear.
+- For children and ADHD/TDAH specifically, include parents/caregivers, teachers, and relevant professionals as target users, and make the CTA about a reviewed pilot/demo rather than self-serve treatment.
+
 Avoid generic startup advice. Be concrete, implementation-oriented, and honest about weaknesses.
 `;
