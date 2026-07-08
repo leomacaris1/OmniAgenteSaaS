@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/omniagent/auth/session";
-import { formatProjectMarkdown } from "@/lib/omniagent/exports/project-export";
+import {
+  formatLandingHtml,
+  formatProjectMarkdown,
+} from "@/lib/omniagent/exports/project-export";
 import { getProject } from "@/lib/omniagent/storage/project-store";
 
 type RouteContext = {
@@ -29,6 +32,15 @@ export async function GET(request: Request, context: RouteContext) {
       headers: {
         "Content-Type": "application/json; charset=utf-8",
         "Content-Disposition": `attachment; filename="omniagent-${project.id}.json"`,
+      },
+    });
+  }
+
+  if (format === "html") {
+    return new NextResponse(formatLandingHtml(project), {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Disposition": `attachment; filename="landing-${project.id}.html"`,
       },
     });
   }
