@@ -9,7 +9,7 @@ datasource db {
 
 model Project {
   id             String              @id @default(cuid())
-  workspaceId    String?
+  workspaceId    String
   title          String
   idea           String
   audience       String?
@@ -20,7 +20,7 @@ model Project {
   output         Json
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
-  workspace      Workspace?          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace      Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   runs           AgentRun[]
   artifacts      GeneratedArtifact[]
   feedback        PilotFeedback[]

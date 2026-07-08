@@ -8,6 +8,7 @@ import type {
   SaveProjectRunInput,
   SaveRunInput,
 } from "@/lib/omniagent/storage/types";
+import { requireProjectScope } from "@/lib/omniagent/storage/types";
 
 type OmniAgentStore = {
   projects: SaaSBuilderOutput[];
@@ -31,14 +32,15 @@ async function writeStore(store: OmniAgentStore) {
   await writeFile(storePath, `${JSON.stringify(store, null, 2)}\n`, "utf8");
 }
 
-function isProjectInScope(project: SaaSBuilderOutput, scope?: ProjectScope) {
-  return !scope?.workspaceId || project.workspaceId === scope.workspaceId;
+function isProjectInScope(project: SaaSBuilderOutput, scope: ProjectScope) {
+  return project.workspaceId === scope.workspaceId;
 }
 
 export const fileProjectRepository: ProjectRepository = {
-  async saveProject(project: SaaSBuilderOutput, run: SaveProjectRunInput, scope?: ProjectScope) {
+  async saveProject(project: SaaSBuilderOutput, run: SaveProjectRunInput, scope: ProjectScope) {
+    const requiredScope = requireProjectScope(scope);
     const store = await readStore();
-    const scopedProject = scope?.workspaceId ? { ...project, workspaceId: scope.workspaceId } : project;
+    const scopedProject = { ...project, workspaceId: requiredScope.workspaceId };
     const agentRun: AgentRun = {
       id: crypto.randomUUID(),
       projectId: scopedProject.id,
@@ -52,25 +54,29 @@ export const fileProjectRepository: ProjectRepository = {
     await writeStore(store);
   },
 
-  async listProjects(scope?: ProjectScope) {
+  async listProjects(scope: ProjectScope) {
+    const requiredScope = requireProjectScope(scope);
     const store = await readStore();
-    return store.projects.filter((project) => isProjectInScope(project, scope));
+    return store.projects.filter((project) => isProjectInScope(project, requiredScope));
   },
 
-  async countProjects(scope?: ProjectScope) {
+  async countProjects(scope: ProjectScope) {
+    const requiredScope = requireProjectScope(scope);
     const store = await readStore();
-    return store.projects.filter((project) => isProjectInScope(project, scope)).length;
+    return store.projects.filter((project) => isProjectInScope(project, requiredScope)).length;
   },
 
-  async getProject(projectId: string, scope?: ProjectScope) {
+  async getProject(projectId: string, scope: ProjectScope) {
+    const requiredScope = requireProjectScope(scope);
     const store = await readStore();
-    return store.projects.find((project) => project.id === projectId && isProjectInScope(project, scope)) ?? null;
+    return store.projects.find((project) => project.id === projectId && isProjectInScope(project, requiredScope)) ?? null;
   },
 
   async updateProjectArtifact(projectId, key, content, scope) {
+    const requiredScope = requireProjectScope(scope);
     const store = await readStore();
     const projectIndex = store.projects.findIndex(
-      (project) => project.id === projectId && isProjectInScope(project, scope),
+      (project) => project.id === projectId && isProjectInScope(project, requiredScope),
     );
 
     if (projectIndex === -1) {
@@ -84,18 +90,20 @@ export const fileProjectRepository: ProjectRepository = {
   },
 
   async replaceProject(projectId, project, scope) {
+    const requiredScope = requireProjectScope(scope);
     const store = await readStore();
     const projectIndex = store.projects.findIndex(
-      (candidate) => candidate.id === projectId && isProjectInScope(candidate, scope),
+      (candidate) => candidate.id === projectId && isProjectInScope(candidate, requiredScope),
     );
 
     if (projectIndex === -1) {
       return null;
     }
 
-    store.projects[projectIndex] = project;
+    const scopedProject = { ...project, workspaceId: requiredScope.workspaceId };
+    store.projects[projectIndex] = scopedProject;
     await writeStore(store);
-    return project;
+    return scopedProject;
   },
 
   async saveRun(projectId: string, run: SaveRunInput) {
@@ -111,13 +119,10 @@ export const fileProjectRepository: ProjectRepository = {
     await writeStore(store);
   },
 
-  async listRuns(scope?: ProjectScope) {
+  async listRuns(scope: ProjectScope) {
+    const requiredScope = requireProjectScope(scope);
     const store = await readStore();
-    if (!scope?.workspaceId) {
-      return store.runs;
-    }
-
-    const projectIds = new Set(store.projects.filter((project) => isProjectInScope(project, scope)).map((project) => project.id));
+    const projectIds = new Set(store.projects.filter((project) => isProjectInScope(project, requiredScope)).map((project) => project.id));
     return store.runs.filter((run) => projectIds.has(run.projectId));
   },
 };

@@ -10,12 +10,12 @@ import { saveProject } from "@/lib/omniagent/storage/project-store";
 import type { SaaSBuilderInput, SaaSBuilderOutput } from "@/lib/omniagent/types";
 
 type SaaSBuilderContext = {
-  workspaceId?: string;
+  workspaceId: string;
 };
 
 export async function runSaaSBuilder(
   input: SaaSBuilderInput,
-  context: SaaSBuilderContext = {},
+  context: SaaSBuilderContext,
 ): Promise<SaaSBuilderOutput> {
   const primary = await getModelProvider();
   const execution = await generatePlanWithFallback(primary, () => localProvider, {

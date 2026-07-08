@@ -6,6 +6,7 @@ import type {
   SaveProjectRunInput,
   SaveRunInput,
 } from "@/lib/omniagent/storage/types";
+import { requireProjectScope } from "@/lib/omniagent/storage/types";
 import { getPrismaClient } from "@/lib/omniagent/storage/prisma-client";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 
@@ -61,8 +62,8 @@ function toInputJson(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 }
 
-function workspaceWhere(projectId: string, scope?: ProjectScope) {
-  return scope?.workspaceId ? { id: projectId, workspaceId: scope.workspaceId } : { id: projectId };
+function workspaceWhere(projectId: string, scope: ProjectScope) {
+  return { id: projectId, workspaceId: scope.workspaceId };
 }
 
 async function writeArtifacts(
@@ -85,16 +86,16 @@ async function writeArtifacts(
 }
 
 export const prismaProjectRepository: ProjectRepository = {
-  async saveProject(project: SaaSBuilderOutput, run: SaveProjectRunInput, scope?: ProjectScope) {
+  async saveProject(project: SaaSBuilderOutput, run: SaveProjectRunInput, scope: ProjectScope) {
+    const requiredScope = requireProjectScope(scope);
     const prisma = await getPrismaClient();
-    const workspaceId = scope?.workspaceId ?? project.workspaceId;
-    const scopedProject = workspaceId ? { ...project, workspaceId } : project;
+    const scopedProject = { ...project, workspaceId: requiredScope.workspaceId };
 
     await prisma.$transaction(async (tx) => {
       await tx.project.create({
         data: {
           id: scopedProject.id,
-          workspaceId,
+          workspaceId: requiredScope.workspaceId,
           title: projectTitle(scopedProject),
           idea: scopedProject.input.idea,
           audience: scopedProject.input.audience,
@@ -120,10 +121,11 @@ export const prismaProjectRepository: ProjectRepository = {
     await writeArtifacts(scopedProject.id, scopedProject, prisma);
   },
 
-  async listProjects(scope?: ProjectScope) {
+  async listProjects(scope: ProjectScope) {
+    const requiredScope = requireProjectScope(scope);
     const prisma = await getPrismaClient();
     const projects = await prisma.project.findMany({
-      where: scope?.workspaceId ? { workspaceId: scope.workspaceId } : undefined,
+      where: { workspaceId: requiredScope.workspaceId },
       orderBy: { createdAt: "desc" },
       take: 50,
       select: { output: true },
@@ -132,18 +134,20 @@ export const prismaProjectRepository: ProjectRepository = {
     return projects.map(toProject);
   },
 
-  async countProjects(scope?: ProjectScope) {
+  async countProjects(scope: ProjectScope) {
+    const requiredScope = requireProjectScope(scope);
     const prisma = await getPrismaClient();
 
     return prisma.project.count({
-      where: scope?.workspaceId ? { workspaceId: scope.workspaceId } : undefined,
+      where: { workspaceId: requiredScope.workspaceId },
     });
   },
 
-  async getProject(projectId: string, scope?: ProjectScope) {
+  async getProject(projectId: string, scope: ProjectScope) {
+    const requiredScope = requireProjectScope(scope);
     const prisma = await getPrismaClient();
     const project = await prisma.project.findFirst({
-      where: workspaceWhere(projectId, scope),
+      where: workspaceWhere(projectId, requiredScope),
       select: { output: true },
     });
 
@@ -154,11 +158,12 @@ export const prismaProjectRepository: ProjectRepository = {
     projectId: string,
     key: EditableArtifactKey,
     content: unknown,
-    scope?: ProjectScope,
+    scope: ProjectScope,
   ) {
+    const requiredScope = requireProjectScope(scope);
     const prisma = await getPrismaClient();
     const existing = await prisma.project.findFirst({
-      where: workspaceWhere(projectId, scope),
+      where: workspaceWhere(projectId, requiredScope),
       select: { output: true },
     });
 
@@ -187,10 +192,11 @@ export const prismaProjectRepository: ProjectRepository = {
     return updatedProject;
   },
 
-  async replaceProject(projectId: string, project: SaaSBuilderOutput, scope?: ProjectScope) {
+  async replaceProject(projectId: string, project: SaaSBuilderOutput, scope: ProjectScope) {
+    const requiredScope = requireProjectScope(scope);
     const prisma = await getPrismaClient();
     const existing = await prisma.project.findFirst({
-      where: workspaceWhere(projectId, scope),
+      where: workspaceWhere(projectId, requiredScope),
       select: { id: true },
     });
 
@@ -208,12 +214,13 @@ export const prismaProjectRepository: ProjectRepository = {
         constraints: project.input.constraints,
         provider: project.provider,
         promptVersion: project.promptVersion,
-        output: toInputJson(project),
+        output: toInputJson({ ...project, workspaceId: requiredScope.workspaceId }),
       },
     });
 
-    await writeArtifacts(projectId, project, prisma);
-    return project;
+    const scopedProject = { ...project, workspaceId: requiredScope.workspaceId };
+    await writeArtifacts(projectId, scopedProject, prisma);
+    return scopedProject;
   },
 
   async saveRun(projectId: string, run: SaveRunInput) {
@@ -232,10 +239,11 @@ export const prismaProjectRepository: ProjectRepository = {
     });
   },
 
-  async listRuns(scope?: ProjectScope) {
+  async listRuns(scope: ProjectScope) {
+    const requiredScope = requireProjectScope(scope);
     const prisma = await getPrismaClient();
     const runs = await prisma.agentRun.findMany({
-      where: scope?.workspaceId ? { project: { workspaceId: scope.workspaceId } } : undefined,
+      where: { project: { workspaceId: requiredScope.workspaceId } },
       orderBy: { createdAt: "desc" },
       take: 100,
     });

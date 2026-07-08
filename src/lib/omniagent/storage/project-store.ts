@@ -6,51 +6,52 @@ import type {
   SaveProjectRunInput,
   SaveRunInput,
 } from "@/lib/omniagent/storage/types";
+import { requireProjectScope } from "@/lib/omniagent/storage/types";
 import type { SaaSBuilderOutput } from "@/lib/omniagent/types";
 
 export async function saveProject(
   project: SaaSBuilderOutput,
   run: SaveProjectRunInput,
-  scope?: ProjectScope,
+  scope: ProjectScope,
 ) {
-  return getProjectRepository().saveProject(project, run, scope);
+  return getProjectRepository().saveProject(project, run, requireProjectScope(scope));
 }
 
 export async function replaceProject(
   projectId: string,
   project: SaaSBuilderOutput,
-  scope?: ProjectScope,
+  scope: ProjectScope,
 ) {
-  return getProjectRepository().replaceProject(projectId, project, scope);
+  return getProjectRepository().replaceProject(projectId, project, requireProjectScope(scope));
 }
 
 export async function saveRun(projectId: string, run: SaveRunInput) {
   return getProjectRepository().saveRun(projectId, run);
 }
 
-export async function listProjects(scope?: ProjectScope) {
-  return getProjectRepository().listProjects(scope);
+export async function listProjects(scope: ProjectScope) {
+  return getProjectRepository().listProjects(requireProjectScope(scope));
 }
 
-export async function countProjects(scope?: ProjectScope) {
-  return getProjectRepository().countProjects(scope);
+export async function countProjects(scope: ProjectScope) {
+  return getProjectRepository().countProjects(requireProjectScope(scope));
 }
 
-export async function getProject(projectId: string, scope?: ProjectScope) {
-  return getProjectRepository().getProject(projectId, scope);
+export async function getProject(projectId: string, scope: ProjectScope) {
+  return getProjectRepository().getProject(projectId, requireProjectScope(scope));
 }
 
 export async function updateProjectArtifact(
   projectId: string,
   key: EditableArtifactKey,
   content: unknown,
-  scope?: ProjectScope,
+  scope: ProjectScope,
 ) {
-  return getProjectRepository().updateProjectArtifact(projectId, key, content, scope);
+  return getProjectRepository().updateProjectArtifact(projectId, key, content, requireProjectScope(scope));
 }
 
-export async function listRuns(scope?: ProjectScope) {
-  return getProjectRepository().listRuns(scope);
+export async function listRuns(scope: ProjectScope) {
+  return getProjectRepository().listRuns(requireProjectScope(scope));
 }
 
 function getProjectRepository(): ProjectRepository {

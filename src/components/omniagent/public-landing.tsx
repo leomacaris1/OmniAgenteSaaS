@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { appRoutes } from "@/lib/omniagent/navigation/routes";
 
 const FOUNDING_PILOT_PRICE = "USD 49/mes";
 const FOUNDING_PILOT_SEATS = 10;
@@ -27,7 +28,7 @@ export function PublicLanding() {
             <span className="text-lg font-semibold">OmniAgent</span>
           </div>
           <Button asChild variant="outline">
-            <Link href="/login">Iniciar sesion</Link>
+            <Link href={appRoutes.commandCenter}>Abrir app</Link>
           </Button>
         </header>
 
@@ -47,7 +48,7 @@ export function PublicLanding() {
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Button asChild size="lg" className="gap-2">
-              <Link href="/login">
+              <Link href={appRoutes.login}>
                 Probar con mi primera idea
                 <ArrowRight className="h-4 w-4" />
               </Link>
@@ -115,7 +116,7 @@ export function PublicLanding() {
                 <PlanItem text="Soporte directo del founder por email" />
               </ul>
               <Button asChild size="lg" className="gap-2">
-                <Link href="/login">
+                <Link href={appRoutes.login}>
                   Reservar mi cupo
                   <ArrowRight className="h-4 w-4" />
                 </Link>
@@ -127,7 +128,7 @@ export function PublicLanding() {
         <footer className="border-t border-border pb-4 pt-6 text-sm text-muted-foreground">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span>OmniAgent — planes de negocio generados con agentes IA.</span>
-            <Link href="/login" className="underline-offset-4 hover:underline">
+            <Link href={appRoutes.commandCenter} className="underline-offset-4 hover:underline">
               Entrar
             </Link>
           </div>
