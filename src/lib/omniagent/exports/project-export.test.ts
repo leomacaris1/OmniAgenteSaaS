@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatBacklogCopy,
+  formatLandingHtml,
   formatLandingCopy,
   formatProjectMarkdown,
 } from "@/lib/omniagent/exports/project-export";
@@ -83,5 +84,30 @@ describe("project export", () => {
 
     expect(copy).toContain("OA-1 — Crear panel inicial (1d, developer)");
     expect(copy).toContain("  - Lista clientes");
+  });
+  it("formats a standalone landing page as HTML", () => {
+    const html = formatLandingHtml(project);
+
+    expect(html).toContain("<!doctype html>");
+    expect(html).toContain("<title>Seguimiento contable sin friccion</title>");
+    expect(html).toContain("<h1>Seguimiento contable sin friccion</h1>");
+    expect(html).toContain("<h2>Control</h2>");
+    expect(html).toContain("Solicitar demo");
+    expect(html).toContain("USD 99");
+  });
+
+  it("escapes generated content in the HTML export", () => {
+    const html = formatLandingHtml({
+      ...project,
+      landingPage: {
+        ...project.landingPage,
+        headline: '<script>alert("xss")</script>',
+        subheadline: "Mejor & mas seguro",
+      },
+    });
+
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).toContain("Mejor &amp; mas seguro");
   });
 });

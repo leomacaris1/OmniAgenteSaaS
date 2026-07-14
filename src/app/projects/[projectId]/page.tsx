@@ -73,6 +73,12 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                 JSON
               </Link>
             </Button>
+            <Button asChild variant="outline" className="gap-2">
+              <Link href={`/api/projects/${project.id}/export?format=html`}>
+                <Download className="h-4 w-4" />
+                Landing HTML
+              </Link>
+            </Button>
           </div>
         </header>
 
