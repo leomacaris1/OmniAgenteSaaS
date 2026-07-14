@@ -1,6 +1,6 @@
 # Arquitectura de OmniAgenteSaaS
 
-> Documento vivo que describe el estado real del sistema, no un plan aspiracional. Última revisión: post "private workspace auth" + "pilot feedback and exports" (Fase 1 del roadmap completa, parte de la Fase 3 adelantada).
+> Documento vivo que describe el estado real del sistema, no un plan aspiracional. Ultima revision: 2026-07-14, post "private workspace auth", workspace scope obligatorio y exports de piloto.
 
 ## 1. Qué es el proyecto
 
@@ -40,7 +40,7 @@ src/
 │           ├── route.ts                                     # GET: proyectos + runs del workspace
 │           └── [projectId]/
 │               ├── route.ts                                 # GET: proyecto + artefactos (scoped)
-│               ├── export/route.ts                           # GET: export Markdown/JSON
+│               ├── export/route.ts                           # GET: export Markdown/JSON/HTML landing
 │               ├── regenerate/route.ts                        # POST: regenera una sección con IA
 │               └── artifacts/[artifactKey]/route.ts          # PATCH: edita un artefacto (scoped)
 ├── components/
@@ -75,7 +75,7 @@ src/
         └── prisma-project-repository.ts # Postgres, queries scoped por workspaceId
 
 prisma/schema.prisma                 # Modelo completo (ver §6)
-supabase/migrations/*.sql             # 4 migraciones SQL versionadas
+supabase/migrations/*.sql             # 5 migraciones SQL versionadas
 ```
 
 ## 4. Autenticación y tenancy (estado actual)
@@ -105,7 +105,7 @@ runSaaSBuilder(input, { workspaceId })
    └─▶ saveProject(project, run + telemetría, { workspaceId })
           └─▶ file | prisma (env OMNIAGENT_STORAGE_DRIVER)
    ▼
-UI: tabs de resultado + historial del workspace + export Markdown/JSON + feedback
+UI: tabs de resultado + historial del workspace + export Markdown/JSON/HTML + feedback
 ```
 
 Regeneración por sección: `POST /api/projects/[id]/regenerate` recibe `artifactKey`
@@ -125,7 +125,7 @@ Workspace/AppUser/Project ───* PilotFeedback
 ```
 
 - **AppUser**: email único, `passwordHash`; **Workspace**: 1 por usuario al registrarse, con `plan` comercial (default `"founding-pilot"`); **WorkspaceMember**: rol como string (default `"owner"`), único por `(userId, workspaceId)`.
-- **Project.workspaceId**: nullable, `onDelete: Cascade`, indexado. El output completo sigue viviendo en `Project.output: Json` como fuente de verdad.
+- **Project.workspaceId**: obligatorio, `onDelete: Restrict`, indexado. La migracion versionada primero hizo backfill de los proyectos existentes y luego aplico la restriccion; el output completo sigue viviendo en `Project.output: Json` como fuente de verdad.
 - **UserSession**: token hasheado, `expiresAt` indexado.
 - **PilotFeedback**: rating opcional 1–5 + mensaje, ligado a workspace/usuario y opcionalmente a un proyecto (validando pertenencia).
 - **AgentRun** ahora incluye telemetría: `fallbackFrom`, `errorMessage`, `inputTokens`, `outputTokens`, `costUsd` (aproximado, no fuente de facturación).
@@ -143,7 +143,7 @@ Workspace/AppUser/Project ───* PilotFeedback
 | `/api/builders/saas` | POST | cookie | Genera proyecto (respeta límite del workspace) |
 | `/api/projects` | GET | cookie | Proyectos + runs del workspace |
 | `/api/projects/[id]` | GET | cookie | Proyecto + artefactos (404 si no es del workspace) |
-| `/api/projects/[id]/export` | GET | cookie | Export `?format=markdown\|json` |
+| `/api/projects/[id]/export` | GET | cookie | Export `?format=markdown\|json\|html`; HTML genera una landing autocontenida y escapada |
 | `/api/projects/[id]/regenerate` | POST | cookie | Regenera una sección con IA (idea editable, con fallback) |
 | `/api/projects/[id]/artifacts/[key]` | PATCH | cookie | Edita un artefacto (scoped) |
 | `/api/feedback` | POST | cookie | Feedback de piloto (rating + mensaje) |
@@ -181,11 +181,10 @@ Supabase actual: ref `fxnrgzxmhorwpdysclue`. No exponer secretos en `NEXT_PUBLIC
 - Criptografía de auth razonable para MVP privado: scrypt con salt, comparación en tiempo constante, tokens de sesión nunca en claro en DB.
 
 **Gaps y riesgos a vigilar:**
-1. **`Project.workspaceId` nullable + `onDelete: Cascade`**: proyectos huérfanos son posibles, y borrar un workspace borra silenciosamente todos sus proyectos (el output generado es la única copia del trabajo). Considerar requerido + `Restrict` cuando haya flujo de borrado real.
-2. **`WorkspaceMember.role` como string** (no enum): sin validación a nivel de DB; hoy solo existe `"owner"`.
-3. **Auth propia = responsabilidad propia**: reset de contraseña, verificación de email y rotación de sesiones no existen todavía. El login ya tiene rate limiting (5 intentos / 15 min por email+IP), pero es **in-memory**: con más de una instancia cada proceso cuenta por separado — mover a un store compartido antes de escalar horizontalmente.
-4. **`SaaSBuilderOutput.workspaceId`**: metadata de tenancy dentro del tipo de dominio que también modela la salida del LLM (el zod schema del provider OpenAI no lo incluye, así que no se pide al modelo, pero el tipo quedó mezclado).
-5. **`PromptVersion` sigue sin usarse** — conectarlo o eliminarlo.
-6. **Costo por run es una estimación**: se calcula con precios configurados por env (`OPENAI_PRICE_*`), no con datos de facturación reales; revisar los defaults cuando cambie el modelo o su pricing.
-7. **`file-project-repository` sin locking**: solo apto para desarrollo mono-proceso.
-8. **Regeneración por sección sin control de concurrencia**: dos regeneraciones simultáneas del mismo proyecto pueden pisarse (last-write-wins sobre `Project.output`). Aceptable mono-usuario; revisar si aparece colaboración real.
+1. **`WorkspaceMember.role` como string** (no enum): sin validación a nivel de DB; hoy solo existe `"owner"`.
+2. **Auth propia = responsabilidad propia**: reset de contraseña, verificación de email y rotación de sesiones no existen todavía. El login ya tiene rate limiting (5 intentos / 15 min por email+IP), pero es **in-memory**: con más de una instancia cada proceso cuenta por separado — mover a un store compartido antes de escalar horizontalmente.
+3. **`SaaSBuilderOutput.workspaceId`**: metadata de tenancy dentro del tipo de dominio que también modela la salida del LLM (el zod schema del provider OpenAI no lo incluye, así que no se pide al modelo, pero el tipo quedó mezclado).
+4. **`PromptVersion` sigue sin usarse** — conectarlo o eliminarlo.
+5. **Costo por run es una estimación**: se calcula con precios configurados por env (`OPENAI_PRICE_*`), no con datos de facturación reales; revisar los defaults cuando cambie el modelo o su pricing.
+6. **`file-project-repository` sin locking**: solo apto para desarrollo mono-proceso.
+7. **Regeneración por sección sin control de concurrencia**: dos regeneraciones simultáneas del mismo proyecto pueden pisarse (last-write-wins sobre `Project.output`). Aceptable mono-usuario; revisar si aparece colaboración real.
