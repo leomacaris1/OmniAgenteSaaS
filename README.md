@@ -16,7 +16,7 @@ Este MVP implementa primero **SaaS Builder**. El usuario ingresa una idea y reci
 - Persistencia por repositorio intercambiable: archivo local o Prisma/Postgres.
 - Supabase/Postgres conectado para proyectos, ejecuciones, usuarios, sesiones y workspaces.
 - Artefactos editables por proyecto: validacion, backlog, landing, pricing y lanzamiento.
-- Export Markdown/JSON por proyecto y copia de landing/backlog al portapapeles.
+- Export Markdown/JSON/HTML por proyecto y copia de landing/backlog al portapapeles.
 - Captura de feedback de pilotos con rating y comentario.
 - Landing publica en `/` para visitantes (vertical: agencias y consultores) con la oferta Founding Pilot.
 - Limite de proyectos por plan de workspace (`founding-pilot`: 20/mes).
@@ -70,7 +70,7 @@ La UI no contiene prompts ni logica de agentes. El builder usa `src/lib/omniagen
 6. El proyecto se guarda con `workspaceId`.
 7. El Command Center muestra solo historial del workspace activo.
 8. El detalle `/projects/[projectId]` permite editar artefactos guardados.
-9. El usuario exporta Markdown/JSON y deja feedback del piloto.
+9. El usuario exporta Markdown/JSON/HTML y deja feedback del piloto.
 
 ## Variables de entorno
 
@@ -120,6 +120,7 @@ supabase/migrations/20260702210000_private_workspace_auth.sql
 supabase/migrations/20260702214000_pilot_feedback_and_limits.sql
 supabase/migrations/20260703100000_agent_run_telemetry.sql
 supabase/migrations/20260703170000_workspace_plan.sql
+supabase/migrations/20260707194915_require_project_workspace.sql
 ```
 
 Proyecto Supabase actual:
